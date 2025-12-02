@@ -21,7 +21,7 @@ class AgentNotificationActivity:
         entities = self.activity.entities or []
         for ent in entities:
             etype = ent.type.lower()
-            
+
             # Get the entity payload - check for properties attribute or convert to dict
             if hasattr(ent, "properties"):
                 payload = ent.properties
