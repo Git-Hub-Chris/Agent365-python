@@ -155,7 +155,9 @@ class TestUtilityFunctions:
         expected = [PROD_MCP_PLATFORM_AUTHENTICATION_SCOPE]
         assert result == expected
 
-    @patch.dict(os.environ, {"MCP_PLATFORM_AUTHENTICATION_SCOPE": "custom-scope/.default"}, clear=False)
+    @patch.dict(
+        os.environ, {"MCP_PLATFORM_AUTHENTICATION_SCOPE": "custom-scope/.default"}, clear=False
+    )
     def test_get_mcp_platform_authentication_scope_custom(self):
         """Test get_mcp_platform_authentication_scope returns custom scope from environment."""
         # Act
@@ -170,7 +172,10 @@ class TestUtilityFunctions:
         # Assert
         assert MCP_PLATFORM_PROD_BASE_URL == "https://agent365.svc.cloud.microsoft"
         assert PPAPI_TOKEN_SCOPE == "https://api.powerplatform.com"
-        assert PROD_MCP_PLATFORM_AUTHENTICATION_SCOPE == "ea9ffc3e-8a23-4a7d-836d-234d7c7565c1/.default"
+        assert (
+            PROD_MCP_PLATFORM_AUTHENTICATION_SCOPE
+            == "ea9ffc3e-8a23-4a7d-836d-234d7c7565c1/.default"
+        )
 
     def test_get_tooling_gateway_empty_agent_id(self):
         """Test get_tooling_gateway_for_digital_worker with empty agent ID."""
