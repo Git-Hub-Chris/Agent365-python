@@ -5,7 +5,6 @@ Provides utility functions for the Tooling components.
 """
 
 import os
-from enum import Enum
 
 
 # Constants for base URLs
@@ -13,13 +12,6 @@ MCP_PLATFORM_PROD_BASE_URL = "https://agent365.svc.cloud.microsoft"
 
 PPAPI_TOKEN_SCOPE = "https://api.powerplatform.com"
 PROD_MCP_PLATFORM_AUTHENTICATION_SCOPE = "ea9ffc3e-8a23-4a7d-836d-234d7c7565c1/.default"
-
-
-class ToolsMode(Enum):
-    """Enum for different tools modes."""
-
-    MCP_PLATFORM = 1
-    MOCK_MCP_SERVER = 2
 
 
 def get_tooling_gateway_for_digital_worker(agentic_app_id: str) -> str:
@@ -43,13 +35,6 @@ def get_mcp_base_url() -> str:
     Returns:
         str: The base URL for MCP servers.
     """
-    environment = _get_current_environment().lower()
-
-    if environment == "development":
-        tools_mode = get_tools_mode()
-        if tools_mode == ToolsMode.MOCK_MCP_SERVER:
-            return os.getenv("MOCK_MCP_SERVER_URL", "http://localhost:5309/mcp-mock/agents/servers")
-
     return f"{_get_mcp_platform_base_url()}/agents/servers"
 
 
@@ -89,21 +74,6 @@ def _get_mcp_platform_base_url() -> str:
         return os.getenv("MCP_PLATFORM_ENDPOINT")
 
     return MCP_PLATFORM_PROD_BASE_URL
-
-
-def get_tools_mode() -> ToolsMode:
-    """
-    Gets the tools mode for the application.
-
-    Returns:
-        ToolsMode: The tools mode enum value.
-    """
-    tools_mode = os.getenv("TOOLS_MODE", "MCPPlatform").lower()
-
-    if tools_mode == "mockmcpserver":
-        return ToolsMode.MOCK_MCP_SERVER
-    else:
-        return ToolsMode.MCP_PLATFORM
 
 
 def get_mcp_platform_authentication_scope():

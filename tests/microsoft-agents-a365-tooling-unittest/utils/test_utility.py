@@ -13,10 +13,10 @@ from microsoft_agents_a365.tooling.utils.utility import (
     build_mcp_server_url,
     _get_current_environment,
     _get_mcp_platform_base_url,
-    get_ppapi_token_scope,
+    get_mcp_platform_authentication_scope,
     MCP_PLATFORM_PROD_BASE_URL,
     PPAPI_TOKEN_SCOPE,
-    PPAPI_TEST_TOKEN_SCOPE,
+    PROD_MCP_PLATFORM_AUTHENTICATION_SCOPE,
 )
 
 
@@ -31,6 +31,7 @@ class TestUtilityFunctions:
             for key in [
                 "ENVIRONMENT",
                 "MCP_PLATFORM_ENDPOINT",
+                "MCP_PLATFORM_AUTHENTICATION_SCOPE",
             ]
         }
 
@@ -52,7 +53,7 @@ class TestUtilityFunctions:
         result = get_tooling_gateway_for_digital_worker(agent_user_id)
 
         # Assert
-        expected = f"{MCP_PLATFORM_PROD_BASE_URL}/agentGateway/agentApplicationInstances/{agent_user_id}/mcpServers"
+        expected = f"{MCP_PLATFORM_PROD_BASE_URL}/agents/{agent_user_id}/mcpServers"
         assert result == expected
 
     @patch.dict(os.environ, {"MCP_PLATFORM_ENDPOINT": "https://custom.endpoint.com"}, clear=False)
@@ -65,7 +66,7 @@ class TestUtilityFunctions:
         result = get_tooling_gateway_for_digital_worker(agent_user_id)
 
         # Assert
-        expected = "https://custom.endpoint.com/agentGateway/agentApplicationInstances/test-agent-456/mcpServers"
+        expected = "https://custom.endpoint.com/agents/test-agent-456/mcpServers"
         assert result == expected
 
     def test_get_mcp_base_url_production(self):
@@ -77,7 +78,7 @@ class TestUtilityFunctions:
         result = get_mcp_base_url()
 
         # Assert
-        expected = f"{MCP_PLATFORM_PROD_BASE_URL}/mcp/environments"
+        expected = f"{MCP_PLATFORM_PROD_BASE_URL}/agents/servers"
         assert result == expected
 
     @patch.dict(os.environ, {"MCP_PLATFORM_ENDPOINT": "https://custom.endpoint.com"}, clear=False)
@@ -87,38 +88,19 @@ class TestUtilityFunctions:
         result = get_mcp_base_url()
 
         # Assert
-        expected = "https://custom.endpoint.com/mcp/environments"
+        expected = "https://custom.endpoint.com/agents/servers"
         assert result == expected
 
     def test_build_mcp_server_url_production(self):
         """Test build_mcp_server_url in production environment."""
         # Arrange
-        environment_id = "prod-env-123"
         server_name = "mail_server"
 
         # Act
-        result = build_mcp_server_url(environment_id, server_name)
+        result = build_mcp_server_url(server_name)
 
         # Assert
-        expected = (
-            f"{MCP_PLATFORM_PROD_BASE_URL}/mcp/environments/{environment_id}/servers/{server_name}"
-        )
-        assert result == expected
-
-    @patch.dict(os.environ, {"ENVIRONMENT": "Development"}, clear=False)
-    def test_build_mcp_server_url_development_platform_mode(self):
-        """Test build_mcp_server_url in development with platform mode."""
-        # Arrange
-        environment_id = "dev-env-456"
-        server_name = "platform_server"
-
-        # Act
-        result = build_mcp_server_url(environment_id, server_name)
-
-        # Assert
-        expected = (
-            f"{MCP_PLATFORM_PROD_BASE_URL}/mcp/environments/{environment_id}/servers/{server_name}"
-        )
+        expected = f"{MCP_PLATFORM_PROD_BASE_URL}/agents/servers/{server_name}"
         assert result == expected
 
     def test_get_current_environment_default(self):
@@ -161,28 +143,26 @@ class TestUtilityFunctions:
         # Assert
         assert result == "https://test.platform.com"
 
-    def test_get_ppapi_token_scope_production(self):
-        """Test get_ppapi_token_scope returns production scope."""
-        # Arrange - Set environment to production explicitly
-        os.environ.pop("ENVIRONMENT", None)
-        # The _get_current_environment defaults to "Development", so we need to set it to something else
-        os.environ["ENVIRONMENT"] = "Production"
+    def test_get_mcp_platform_authentication_scope_production(self):
+        """Test get_mcp_platform_authentication_scope returns production scope."""
+        # Arrange - Clear environment variable to use default
+        os.environ.pop("MCP_PLATFORM_AUTHENTICATION_SCOPE", None)
 
         # Act
-        result = get_ppapi_token_scope()
+        result = get_mcp_platform_authentication_scope()
 
         # Assert
-        expected = [PPAPI_TOKEN_SCOPE + "/.default"]
+        expected = [PROD_MCP_PLATFORM_AUTHENTICATION_SCOPE]
         assert result == expected
 
-    @patch.dict(os.environ, {"ENVIRONMENT": "Development"}, clear=False)
-    def test_get_ppapi_token_scope_development(self):
-        """Test get_ppapi_token_scope returns test scope in development."""
+    @patch.dict(os.environ, {"MCP_PLATFORM_AUTHENTICATION_SCOPE": "custom-scope/.default"}, clear=False)
+    def test_get_mcp_platform_authentication_scope_custom(self):
+        """Test get_mcp_platform_authentication_scope returns custom scope from environment."""
         # Act
-        result = get_ppapi_token_scope()
+        result = get_mcp_platform_authentication_scope()
 
         # Assert
-        expected = [PPAPI_TEST_TOKEN_SCOPE + "/.default"]
+        expected = ["custom-scope/.default"]
         assert result == expected
 
     def test_constants_values(self):
@@ -190,7 +170,7 @@ class TestUtilityFunctions:
         # Assert
         assert MCP_PLATFORM_PROD_BASE_URL == "https://agent365.svc.cloud.microsoft"
         assert PPAPI_TOKEN_SCOPE == "https://api.powerplatform.com"
-        assert PPAPI_TEST_TOKEN_SCOPE == "https://api.test.powerplatform.com"
+        assert PROD_MCP_PLATFORM_AUTHENTICATION_SCOPE == "ea9ffc3e-8a23-4a7d-836d-234d7c7565c1/.default"
 
     def test_get_tooling_gateway_empty_agent_id(self):
         """Test get_tooling_gateway_for_digital_worker with empty agent ID."""
@@ -201,20 +181,17 @@ class TestUtilityFunctions:
         result = get_tooling_gateway_for_digital_worker(agent_user_id)
 
         # Assert - Function should still work but produce invalid URL
-        expected = (
-            f"{MCP_PLATFORM_PROD_BASE_URL}/agentGateway/agentApplicationInstances//mcpServers"
-        )
+        expected = f"{MCP_PLATFORM_PROD_BASE_URL}/agents//mcpServers"
         assert result == expected
 
     def test_build_mcp_server_url_empty_params(self):
         """Test build_mcp_server_url with empty parameters."""
         # Arrange
-        environment_id = ""
         server_name = ""
 
         # Act
-        result = build_mcp_server_url(environment_id, server_name)
+        result = build_mcp_server_url(server_name)
 
         # Assert
-        expected = f"{MCP_PLATFORM_PROD_BASE_URL}/mcp/environments//servers/"
+        expected = f"{MCP_PLATFORM_PROD_BASE_URL}/agents/servers/"
         assert result == expected
