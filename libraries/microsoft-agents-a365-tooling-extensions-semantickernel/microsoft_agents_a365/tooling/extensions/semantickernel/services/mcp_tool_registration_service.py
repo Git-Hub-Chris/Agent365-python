@@ -14,24 +14,18 @@ import os
 import re
 from typing import Any, Optional
 from semantic_kernel import kernel as sk
+from semantic_kernel.connectors.mcp import MCPStreamableHttpPlugin
 from microsoft_agents.hosting.core import Authorization, TurnContext
-
-# Third-party imports
-
-# Local imports
-from ...common.services.mcp_tool_server_configuration_service import (
+from microsoft_agents_a365.runtime.utility import Utility
+from microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service import (
     McpToolServerConfigurationService,
 )
-from ...common.models import MCPServerConfig
-from ...common.utils.constants import Constants
-from ...common.utils.utility import (
+from microsoft_agents_a365.tooling.models.mcp_server_config import MCPServerConfig
+from microsoft_agents_a365.tooling.utils.constants import Constants
+from microsoft_agents_a365.tooling.utils.utility import (
     get_tools_mode,
     get_mcp_platform_authentication_scope,
-    get_use_environment_id,
 )
-
-
-from semantic_kernel.connectors.mcp import MCPStreamableHttpPlugin
 
 
 class McpToolRegistrationService:
@@ -84,9 +78,8 @@ class McpToolRegistrationService:
     async def add_tool_servers_to_agent(
         self,
         kernel: sk.Kernel,
-        agentic_app_id: str,
-        environment_id: str,
         auth: Authorization,
+        auth_handler_name: str,
         context: TurnContext,
         auth_token: Optional[str] = None,
     ) -> None:
@@ -95,8 +88,9 @@ class McpToolRegistrationService:
 
         Args:
             kernel: The Semantic Kernel instance to which the tools will be added.
-            agentic_app_id: Agentic App ID for the agent.
-            environment_id: Environment ID for the environment.
+            auth: Authorization handler for token exchange.
+            auth_handler_name: Name of the authorization handler.
+            context: Turn context for the current operation.
             auth_token: Authentication token to access the MCP servers.
 
         Raises:
@@ -106,14 +100,15 @@ class McpToolRegistrationService:
 
         if not auth_token:
             scopes = get_mcp_platform_authentication_scope()
-            authToken = await auth.exchange_token(context, scopes, "AGENTIC")
+            authToken = await auth.exchange_token(context, scopes, auth_handler_name)
             auth_token = authToken.token
 
-        self._validate_inputs(kernel, agentic_app_id, environment_id, auth_token)
+        agentic_app_id = Utility.resolve_agent_identity(context, auth_token)
+        self._validate_inputs(kernel, agentic_app_id, auth_token)
 
         # Get and process servers
         servers = await self._mcp_server_configuration_service.list_tool_servers(
-            agentic_app_id, environment_id, auth_token
+            agentic_app_id, auth_token
         )
         self._logger.info(f"🔧 Adding MCP tools from {len(servers)} servers")
 
@@ -130,17 +125,8 @@ class McpToolRegistrationService:
                 headers = {}
 
                 if tools_mode == "MockMCPServer":
-                    # Mock server does not require bearer auth, but still forward environment id if available.
-                    if get_use_environment_id() and environment_id:
-                        headers[Constants.Headers.ENVIRONMENT_ID] = environment_id
-
                     if mock_auth_header := os.getenv("MOCK_MCP_AUTHORIZATION"):
                         headers[Constants.Headers.AUTHORIZATION] = mock_auth_header
-                elif get_use_environment_id():
-                    headers = {
-                        Constants.Headers.AUTHORIZATION: f"{Constants.Headers.BEARER_PREFIX} {auth_token}",
-                        Constants.Headers.ENVIRONMENT_ID: environment_id,
-                    }
                 else:
                     headers = {
                         Constants.Headers.AUTHORIZATION: f"{Constants.Headers.BEARER_PREFIX} {auth_token}",
@@ -177,16 +163,12 @@ class McpToolRegistrationService:
     # Private Methods - Input Validation & Processing
     # ============================================================================
 
-    def _validate_inputs(
-        self, kernel: Any, agentic_app_id: str, environment_id: str, auth_token: str
-    ) -> None:
+    def _validate_inputs(self, kernel: Any, agentic_app_id: str, auth_token: str) -> None:
         """Validate all required inputs."""
         if kernel is None:
             raise ValueError("kernel cannot be None")
         if not agentic_app_id or not agentic_app_id.strip():
             raise ValueError("agentic_app_id cannot be null or empty")
-        if get_use_environment_id() and (not environment_id or not environment_id.strip()):
-            raise ValueError("environment_id cannot be null or empty")
         if not auth_token or not auth_token.strip():
             raise ValueError("auth_token cannot be null or empty")
 

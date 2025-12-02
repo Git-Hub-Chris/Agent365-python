@@ -9,6 +9,7 @@ from agent_framework.openai import OpenAIChatClient
 
 from microsoft_agents.hosting.core import Authorization, TurnContext
 
+from microsoft_agents_a365.runtime.utility import Utility
 from microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service import (
     McpToolServerConfigurationService,
 )
@@ -16,7 +17,6 @@ from microsoft_agents_a365.tooling.utils.constants import Constants
 
 from microsoft_agents_a365.tooling.utils.utility import (
     get_mcp_platform_authentication_scope,
-    get_use_environment_id,
 )
 
 
@@ -46,9 +46,8 @@ class McpToolRegistrationService:
         chat_client: Union[OpenAIChatClient, AzureOpenAIChatClient],
         agent_instructions: str,
         initial_tools: List[Any],
-        agentic_app_id: str,
-        environment_id: str,
         auth: Authorization,
+        auth_handler_name: str,
         turn_context: TurnContext,
         auth_token: Optional[str] = None,
     ) -> Optional[ChatAgent]:
@@ -59,9 +58,8 @@ class McpToolRegistrationService:
             chat_client: The chat client instance (Union[OpenAIChatClient, AzureOpenAIChatClient])
             agent_instructions: Instructions for the agent behavior
             initial_tools: List of initial tools to add to the agent
-            agentic_app_id: Agentic app identifier for the agent
-            environment_id: Environment identifier for MCP server discovery
             auth: Authorization context for token exchange
+            auth_handler_name: Name of the authorization handler.
             turn_context: Turn context for the operation
             auth_token: Optional bearer token for authentication
 
@@ -72,20 +70,16 @@ class McpToolRegistrationService:
             # Exchange token if not provided
             if not auth_token:
                 scopes = get_mcp_platform_authentication_scope()
-                authToken = await auth.exchange_token(turn_context, scopes, "AGENTIC")
+                authToken = await auth.exchange_token(turn_context, scopes, auth_handler_name)
                 auth_token = authToken.token
 
-            if get_use_environment_id():
-                self._logger.info(
-                    f"Listing MCP tool servers for agent {agentic_app_id} in environment {environment_id}"
-                )
-            else:
-                self._logger.info(f"Listing MCP tool servers for agent {agentic_app_id}")
+            agentic_app_id = Utility.resolve_agent_identity(turn_context, auth_token)
+
+            self._logger.info(f"Listing MCP tool servers for agent {agentic_app_id}")
 
             # Get MCP server configurations
             server_configs = await self._mcp_server_configuration_service.list_tool_servers(
                 agentic_app_id=agentic_app_id,
-                environment_id=environment_id,
                 auth_token=auth_token,
             )
 
@@ -110,8 +104,6 @@ class McpToolRegistrationService:
                         headers[Constants.Headers.AUTHORIZATION] = (
                             f"{Constants.Headers.BEARER_PREFIX} {auth_token}"
                         )
-                    if get_use_environment_id() and environment_id:
-                        headers[Constants.Headers.ENVIRONMENT_ID] = environment_id
 
                     server_name = getattr(config, "mcp_server_name", "Unknown")
 

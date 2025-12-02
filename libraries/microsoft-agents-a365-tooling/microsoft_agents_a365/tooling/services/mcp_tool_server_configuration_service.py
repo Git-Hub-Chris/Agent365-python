@@ -30,11 +30,7 @@ import aiohttp
 # Local imports
 from ..models import MCPServerConfig
 from ..utils import Constants
-from ..utils.utility import (
-    get_tooling_gateway_for_digital_worker,
-    build_mcp_server_url,
-    get_use_environment_id,
-)
+from ..utils.utility import get_tooling_gateway_for_digital_worker, build_mcp_server_url
 
 
 # ==============================================================================
@@ -70,14 +66,13 @@ class McpToolServerConfigurationService:
     # --------------------------------------------------------------------------
 
     async def list_tool_servers(
-        self, agentic_app_id: str, environment_id: str, auth_token: str
+        self, agentic_app_id: str, auth_token: str
     ) -> List[MCPServerConfig]:
         """
         Gets the list of MCP Servers that are configured for the agent.
 
         Args:
             agentic_app_id: Agentic App ID for the agent.
-            environment_id: Environment ID for the environment.
             auth_token: Authentication token to access the MCP servers.
 
         Returns:
@@ -88,20 +83,15 @@ class McpToolServerConfigurationService:
             Exception: If there's an error communicating with the tooling gateway.
         """
         # Validate input parameters
-        self._validate_input_parameters(agentic_app_id, environment_id, auth_token)
+        self._validate_input_parameters(agentic_app_id, auth_token)
 
-        if get_use_environment_id():
-            self._logger.info(
-                f"Listing MCP tool servers for agent {agentic_app_id} in environment {environment_id}"
-            )
-        else:
-            self._logger.info(f"Listing MCP tool servers for agent {agentic_app_id}")
+        self._logger.info(f"Listing MCP tool servers for agent {agentic_app_id}")
 
         # Determine configuration source based on environment
         if self._is_development_scenario():
-            return self._load_servers_from_manifest(environment_id)
+            return self._load_servers_from_manifest()
         else:
-            return await self._load_servers_from_gateway(agentic_app_id, environment_id, auth_token)
+            return await self._load_servers_from_gateway(agentic_app_id, auth_token)
 
     # --------------------------------------------------------------------------
     # ENVIRONMENT DETECTION
@@ -124,7 +114,7 @@ class McpToolServerConfigurationService:
     # DEVELOPMENT: MANIFEST-BASED CONFIGURATION
     # --------------------------------------------------------------------------
 
-    def _load_servers_from_manifest(self, environment_id: str) -> List[MCPServerConfig]:
+    def _load_servers_from_manifest(self) -> List[MCPServerConfig]:
         """
         Reads MCP server configurations from ToolingManifest.json in the application's content root.
 
@@ -144,9 +134,6 @@ class McpToolServerConfigurationService:
           ]
         }
 
-        Args:
-            environment_id: Environment ID to construct full URLs.
-
         Returns:
             List[MCPServerConfig]: List of MCP server configurations from manifest.
 
@@ -160,7 +147,7 @@ class McpToolServerConfigurationService:
 
             if manifest_path and manifest_path.exists():
                 self._logger.info(f"Loading MCP servers from: {manifest_path}")
-                mcp_servers = self._parse_manifest_file(manifest_path, environment_id)
+                mcp_servers = self._parse_manifest_file(manifest_path)
             else:
                 self._log_manifest_search_failure()
 
@@ -214,7 +201,7 @@ class McpToolServerConfigurationService:
             else:
                 # Running as normal Python script
                 current_file_path = Path(__file__)
-                # Navigate from kairo/tooling/common/services/ to project root
+                # Navigate to project root
                 base_dir = current_file_path.parent.parent.parent.parent
 
             search_locations.extend(
@@ -225,15 +212,12 @@ class McpToolServerConfigurationService:
 
         return search_locations
 
-    def _parse_manifest_file(
-        self, manifest_path: Path, environment_id: str
-    ) -> List[MCPServerConfig]:
+    def _parse_manifest_file(self, manifest_path: Path) -> List[MCPServerConfig]:
         """
         Parses the manifest file and extracts MCP server configurations.
 
         Args:
             manifest_path: Path to the manifest file.
-            environment_id: Environment ID for URL construction.
 
         Returns:
             List of parsed MCP server configurations.
@@ -255,9 +239,7 @@ class McpToolServerConfigurationService:
                 print(f"📊 Processing {len(mcp_servers_data)} server entries")
                 for server_element in mcp_servers_data:
                     print(f"🔧 Processing server element: {server_element}")
-                    server_config = self._parse_manifest_server_config(
-                        server_element, environment_id
-                    )
+                    server_config = self._parse_manifest_server_config(server_element)
                     if server_config is not None:
                         print(
                             f"✅ Created server config: {server_config.mcp_server_name} -> {server_config.mcp_server_unique_name}"
@@ -293,14 +275,13 @@ class McpToolServerConfigurationService:
     # --------------------------------------------------------------------------
 
     async def _load_servers_from_gateway(
-        self, agentic_app_id: str, environment_id: str, auth_token: str
+        self, agentic_app_id: str, auth_token: str
     ) -> List[MCPServerConfig]:
         """
         Reads MCP server configurations from tooling gateway endpoint for production scenario.
 
         Args:
             agentic_app_id: Agentic App ID for the agent.
-            environment_id: Environment ID for the environment.
             auth_token: Authentication token to access the tooling gateway.
 
         Returns:
@@ -313,7 +294,7 @@ class McpToolServerConfigurationService:
 
         try:
             config_endpoint = get_tooling_gateway_for_digital_worker(agentic_app_id)
-            headers = self._prepare_gateway_headers(auth_token, environment_id)
+            headers = self._prepare_gateway_headers(auth_token)
 
             self._logger.info(f"Calling tooling gateway endpoint: {config_endpoint}")
 
@@ -342,22 +323,16 @@ class McpToolServerConfigurationService:
 
         return mcp_servers
 
-    def _prepare_gateway_headers(self, auth_token: str, environment_id: str) -> Dict[str, str]:
+    def _prepare_gateway_headers(self, auth_token: str) -> Dict[str, str]:
         """
         Prepares headers for tooling gateway requests.
 
         Args:
             auth_token: Authentication token.
-            environment_id: Environment ID.
 
         Returns:
             Dictionary of HTTP headers.
         """
-        if get_use_environment_id():
-            return {
-                "Authorization": f"{Constants.Headers.BEARER_PREFIX} {auth_token}",
-                Constants.Headers.ENVIRONMENT_ID: environment_id,
-            }
         return {
             "Authorization": f"{Constants.Headers.BEARER_PREFIX} {auth_token}",
         }
@@ -392,14 +367,13 @@ class McpToolServerConfigurationService:
     # --------------------------------------------------------------------------
 
     def _parse_manifest_server_config(
-        self, server_element: Dict[str, Any], environment_id: str
+        self, server_element: Dict[str, Any]
     ) -> Optional[MCPServerConfig]:
         """
         Parses a server configuration from manifest data, constructing full URL.
 
         Args:
             server_element: Dictionary containing server configuration from manifest.
-            environment_id: Environment ID to construct full URL.
 
         Returns:
             MCPServerConfig object or None if parsing fails.
@@ -412,7 +386,7 @@ class McpToolServerConfigurationService:
                 return None
 
             # Construct full URL using environment utilities
-            full_url = build_mcp_server_url(environment_id, server_name)
+            full_url = build_mcp_server_url(server_name)
 
             return MCPServerConfig(mcp_server_name=name, mcp_server_unique_name=full_url)
 
@@ -447,15 +421,12 @@ class McpToolServerConfigurationService:
     # VALIDATION AND UTILITY HELPERS
     # --------------------------------------------------------------------------
 
-    def _validate_input_parameters(
-        self, agentic_app_id: str, environment_id: str, auth_token: str
-    ) -> None:
+    def _validate_input_parameters(self, agentic_app_id: str, auth_token: str) -> None:
         """
         Validates input parameters for the main API method.
 
         Args:
             agentic_app_id: Agentic App ID to validate.
-            environment_id: Environment ID to validate.
             auth_token: Authentication token to validate.
 
         Raises:
@@ -463,8 +434,6 @@ class McpToolServerConfigurationService:
         """
         if not agentic_app_id:
             raise ValueError("agentic_app_id cannot be empty or None")
-        if get_use_environment_id() and not environment_id:
-            raise ValueError("environment_id cannot be empty or None")
         if not auth_token:
             raise ValueError("auth_token cannot be empty or None")
 

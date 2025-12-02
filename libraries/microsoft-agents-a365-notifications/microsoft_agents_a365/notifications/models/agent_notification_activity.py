@@ -21,7 +21,7 @@ class AgentNotificationActivity:
         entities = self.activity.entities or []
         for ent in entities:
             etype = ent.type.lower()
-            payload = getattr(ent, "properties", ent)
+            payload = getattr(ent, "additional_properties", ent)
 
             if etype == NotificationTypes.EMAIL_NOTIFICATION.lower() and self._email is None:
                 try:

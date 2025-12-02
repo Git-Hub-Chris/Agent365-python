@@ -19,6 +19,13 @@ COMMON_ATTRIBUTES = [
     consts.GEN_AI_AGENT_BLUEPRINT_ID_KEY,  # gen_ai.agent.applicationid
     consts.GEN_AI_AGENT_AUID_KEY,
     consts.GEN_AI_AGENT_TYPE_KEY,
+    consts.OPERATION_SOURCE_KEY,  # operation.source
+    consts.SESSION_ID_KEY,
+    consts.SESSION_DESCRIPTION_KEY,
+    consts.HIRING_MANAGER_ID_KEY,
+    # Execution context
+    consts.GEN_AI_EXECUTION_SOURCE_NAME_KEY,  # gen_ai.channel.name
+    consts.GEN_AI_EXECUTION_SOURCE_DESCRIPTION_KEY,  # gen_ai.channel.link
 ]
 
 # Invoke Agent–specific attributes
@@ -36,9 +43,5 @@ INVOKE_AGENT_ATTRIBUTES = [
     consts.GEN_AI_CALLER_AGENT_UPN_KEY,  # gen_ai.caller.agent.upn
     consts.GEN_AI_CALLER_AGENT_TENANT_ID_KEY,  # gen_ai.caller.agent.tenantid
     consts.GEN_AI_CALLER_AGENT_APPLICATION_ID_KEY,  # gen_ai.caller.agent.applicationid
-    # Execution context
     consts.GEN_AI_EXECUTION_TYPE_KEY,  # gen_ai.execution.type
-    consts.GEN_AI_EXECUTION_SOURCE_ID_KEY,  # gen_ai.execution.sourceMetadata.id
-    consts.GEN_AI_EXECUTION_SOURCE_NAME_KEY,  # gen_ai.execution.sourceMetadata.name
-    consts.GEN_AI_EXECUTION_SOURCE_DESCRIPTION_KEY,  # gen_ai.execution.sourceMetadata.description
 ]

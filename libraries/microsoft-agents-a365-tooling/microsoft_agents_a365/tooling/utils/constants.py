@@ -12,7 +12,7 @@ class Constants:
 
     class Headers:
         """
-        Provides constant header values used for authentication and environment identification.
+        Provides constant header values used for authentication.
         """
 
         #: The header name used for HTTP authorization tokens.
@@ -20,6 +20,3 @@ class Constants:
 
         #: The prefix used for Bearer authentication tokens in HTTP headers.
         BEARER_PREFIX = "Bearer"
-
-        #: The header name used to specify the environment identifier in HTTP requests.
-        ENVIRONMENT_ID = "x-ms-environment-id"

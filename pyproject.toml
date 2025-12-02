@@ -38,7 +38,7 @@ dev-dependencies = [
     "ruff>=0.1.0",
     "python-dotenv>=1.0.0",
     "openai>=1.0.0",
-    "agent-framework-azure-ai >= 0.1.0",
+    "agent-framework-azure-ai >= 1.0.0b251114",
     "azure-identity>=1.12.0",
     "openai-agents >= 0.2.6",
 ]

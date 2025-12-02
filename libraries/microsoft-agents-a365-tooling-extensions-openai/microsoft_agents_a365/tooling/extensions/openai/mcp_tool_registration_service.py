@@ -12,13 +12,13 @@ from agents.mcp import (
     MCPServerStreamableHttp,
     MCPServerStreamableHttpParams,
 )
+from microsoft_agents_a365.runtime.utility import Utility
 from microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service import (
     McpToolServerConfigurationService,
 )
 
 from microsoft_agents_a365.tooling.utils.utility import (
     get_mcp_platform_authentication_scope,
-    get_use_environment_id,
 )
 
 
@@ -51,9 +51,8 @@ class McpToolRegistrationService:
     async def add_tool_servers_to_agent(
         self,
         agent: Agent,
-        agentic_app_id: str,
-        environment_id: str,
         auth: Authorization,
+        auth_handler_name: str,
         context: TurnContext,
         auth_token: Optional[str] = None,
     ):
@@ -66,9 +65,10 @@ class McpToolRegistrationService:
 
         Args:
             agent: The existing agent to add servers to
-            agentic_app_id: Agentic App ID for the agent
-            environment_id: Environment ID for the environment
-            auth_token: Authentication token to access the MCP servers
+            auth: Authorization handler for token exchange.
+            auth_handler_name: Name of the authorization handler.
+            context: Turn context for the current operation.
+            auth_token: Authentication token to access the MCP servers.
 
         Returns:
             New Agent instance with all MCP servers, or original agent if no new servers
@@ -76,22 +76,17 @@ class McpToolRegistrationService:
 
         if not auth_token:
             scopes = get_mcp_platform_authentication_scope()
-            authToken = await auth.exchange_token(context, scopes, "AGENTIC")
+            authToken = await auth.exchange_token(context, scopes, auth_handler_name)
             auth_token = authToken.token
 
         # Get MCP server configurations from the configuration service
         # mcp_server_configs = []
         # TODO: radevika: Update once the common project is merged.
 
-        if get_use_environment_id():
-            self._logger.info(
-                f"Listing MCP tool servers for agent {agentic_app_id} in environment {environment_id}"
-            )
-        else:
-            self._logger.info(f"Listing MCP tool servers for agent {agentic_app_id}")
+        agentic_app_id = Utility.resolve_agent_identity(context, auth_token)
+        self._logger.info(f"Listing MCP tool servers for agent {agentic_app_id}")
         mcp_server_configs = await self.config_service.list_tool_servers(
             agentic_app_id=agentic_app_id,
-            environment_id=environment_id,
             auth_token=auth_token,
         )
 
@@ -138,8 +133,6 @@ class McpToolRegistrationService:
                     headers = si.headers or {}
                     if auth_token:
                         headers["Authorization"] = f"Bearer {auth_token}"
-                    if get_use_environment_id() and environment_id:
-                        headers["x-ms-environment-id"] = environment_id
 
                     # Create MCPServerStreamableHttpParams with proper configuration
                     params = MCPServerStreamableHttpParams(url=si.url, headers=headers)

@@ -16,7 +16,7 @@ from microsoft_agents_a365.observability.extensions.agentframework.span_processo
 # -----------------------------
 # 3) The Instrumentor class
 # -----------------------------
-_instruments = ("agent-framework-azure-ai >= 0.1.0",)
+_instruments = ("agent-framework-azure-ai >= 1.0.0b251114",)
 
 
 class AgentFrameworkInstrumentor(BaseInstrumentor):
@@ -28,7 +28,7 @@ class AgentFrameworkInstrumentor(BaseInstrumentor):
     def __init__(self):
         if not is_configured():
             raise RuntimeError(
-                "Agent365 (or your telemetry config) is not initialized. Configure it before instrumenting."
+                "Microsoft Agent 365 (or your telemetry config) is not initialized. Configure it before instrumenting."
             )
         super().__init__()
 

@@ -77,6 +77,15 @@ _version.py
 .coverage.*
 htmlcov/
 
+# Test coverage and reports
+htmlcov/
+.coverage
+coverage.xml
+test-report.html
+test-results.xml
+*.cover
+.hypothesis/
+
 # Virtual environments
 .venv/
 venv/

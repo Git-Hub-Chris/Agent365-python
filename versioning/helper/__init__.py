@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-"""Agent365 Python SDK setup utilities."""
+"""Microsoft Agent 365 Python SDK setup utilities."""
 
 from .setup_utils import (
     get_package_version,

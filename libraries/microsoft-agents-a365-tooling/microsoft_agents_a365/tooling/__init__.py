@@ -1,12 +1,11 @@
-# Copyright (c) Microsoft. All rights reserved.
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
 
 """
-Kairo SDK Tooling Common
-
-Equivalent to Microsoft.Kairo.Sdk.Tooling.Common
+Microsoft Agent 365 Tooling SDK
 
 Core tooling functionality shared across different AI frameworks.
-Provides base utilities, CLI tools, and common helper functions.
+Provides base utilities and common helper functions.
 """
 
 from .models import MCPServerConfig
