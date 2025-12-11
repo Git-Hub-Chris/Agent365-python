@@ -172,7 +172,9 @@ class McpToolRegistrationService:
         if not auth_token or not auth_token.strip():
             raise ValueError("auth_token cannot be null or empty")
 
-    async def _add_hardcoded_tools_for_server(self, kernel: sk.Kernel, server: MCPServerConfig) -> None:
+    async def _add_hardcoded_tools_for_server(
+        self, kernel: sk.Kernel, server: MCPServerConfig
+    ) -> None:
         """Add hardcoded tools for a specific server (equivalent to C# hardcoded tool logic)."""
         server_name = server.mcp_server_name
 
