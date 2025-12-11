@@ -12,7 +12,7 @@ servers to agents.
 import logging
 import os
 import re
-from typing import Any, Optional
+from typing import Optional
 from semantic_kernel import kernel as sk
 from semantic_kernel.connectors.mcp import MCPStreamableHttpPlugin
 from microsoft_agents.hosting.core import Authorization, TurnContext
@@ -163,7 +163,7 @@ class McpToolRegistrationService:
     # Private Methods - Input Validation & Processing
     # ============================================================================
 
-    def _validate_inputs(self, kernel: Any, agentic_app_id: str, auth_token: str) -> None:
+    def _validate_inputs(self, kernel: sk.Kernel, agentic_app_id: str, auth_token: str) -> None:
         """Validate all required inputs."""
         if kernel is None:
             raise ValueError("kernel cannot be None")
@@ -172,7 +172,7 @@ class McpToolRegistrationService:
         if not auth_token or not auth_token.strip():
             raise ValueError("auth_token cannot be null or empty")
 
-    async def _add_hardcoded_tools_for_server(self, kernel: Any, server: MCPServerConfig) -> None:
+    async def _add_hardcoded_tools_for_server(self, kernel: sk.Kernel, server: MCPServerConfig) -> None:
         """Add hardcoded tools for a specific server (equivalent to C# hardcoded tool logic)."""
         server_name = server.mcp_server_name
 

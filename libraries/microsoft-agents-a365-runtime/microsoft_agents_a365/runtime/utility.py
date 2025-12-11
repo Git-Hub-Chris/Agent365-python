@@ -12,9 +12,12 @@ from __future__ import annotations
 import platform
 import uuid
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Optional
 
 import jwt
+
+if TYPE_CHECKING:
+    from microsoft_agents.hosting.core import TurnContext
 
 
 class Utility:
@@ -57,7 +60,7 @@ class Utility:
             return ""
 
     @staticmethod
-    def resolve_agent_identity(context: Any, auth_token: Optional[str]) -> str:
+    def resolve_agent_identity(context: Optional["TurnContext"], auth_token: Optional[str]) -> str:
         """
         Resolves the agent identity from the turn context or auth token.
 

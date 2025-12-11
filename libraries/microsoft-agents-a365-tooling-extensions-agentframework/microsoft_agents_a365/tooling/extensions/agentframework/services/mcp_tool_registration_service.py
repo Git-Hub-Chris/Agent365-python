@@ -1,6 +1,6 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-from typing import Optional, List, Any, Union
+from typing import Optional, List, Union
 import logging
 
 from agent_framework import ChatAgent, MCPStreamableHTTPTool
@@ -45,7 +45,7 @@ class McpToolRegistrationService:
         self,
         chat_client: Union[OpenAIChatClient, AzureOpenAIChatClient],
         agent_instructions: str,
-        initial_tools: List[Any],
+        initial_tools: List[MCPStreamableHTTPTool],
         auth: Authorization,
         auth_handler_name: str,
         turn_context: TurnContext,
