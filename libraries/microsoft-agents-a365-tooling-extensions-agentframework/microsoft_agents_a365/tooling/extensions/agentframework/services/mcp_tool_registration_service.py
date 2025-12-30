@@ -97,12 +97,6 @@ class McpToolRegistrationService:
             # Add servers as MCPStreamableHTTPTool instances
             for config in server_configs:
                 try:
-                    # Use the URL from config (always populated by the configuration service)
-                    server_url = config.url
-                    if not server_url:
-                        self._logger.warning(f"MCP server config missing server_url: {config}")
-                        continue
-
                     # Prepare auth headers
                     headers = {}
                     if auth_token:
@@ -119,7 +113,7 @@ class McpToolRegistrationService:
                     # Create and configure MCPStreamableHTTPTool
                     mcp_tools = MCPStreamableHTTPTool(
                         name=server_name,
-                        url=server_url,
+                        url=config.url,
                         headers=headers,
                         description=f"MCP tools from {server_name}",
                     )
