@@ -120,7 +120,7 @@ class McpToolRegistrationService:
                     )
 
                     # Let Agent Framework handle the connection automatically
-                    self._logger.info(f"Created MCP plugin for '{server_name}' at {server_url}")
+                    self._logger.info(f"Created MCP plugin for '{server_name}' at {config.url}")
 
                     all_tools.append(mcp_tools)
                     self._connected_servers.append(mcp_tools)
