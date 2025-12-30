@@ -399,10 +399,10 @@ class McpToolServerConfigurationService:
                 return None
 
             # Check if a custom URL is provided
-            custom_url = self._extract_server_url(server_element)
+            endpoint = self._extract_server_url(server_element)
 
             # Determine the final URL: use custom URL if provided, otherwise construct it
-            final_url = custom_url if custom_url else build_mcp_server_url(server_name)
+            final_url = endpoint if endpoint else build_mcp_server_url(server_name)
 
             return MCPServerConfig(
                 mcp_server_name=name, mcp_server_unique_name=server_name, url=final_url
@@ -431,10 +431,10 @@ class McpToolServerConfigurationService:
                 return None
 
             # Check if a custom URL is provided by the gateway
-            custom_url = self._extract_server_url(server_element)
+            endpoint = self._extract_server_url(server_element)
 
             # Determine the final URL: use custom URL if provided, otherwise construct it
-            final_url = custom_url if custom_url else build_mcp_server_url(mcp_server_unique_name)
+            final_url = endpoint if endpoint else build_mcp_server_url(mcp_server_unique_name)
 
             return MCPServerConfig(mcp_server_name=name, mcp_server_unique_name=mcp_server_unique_name, url=final_url)
 
