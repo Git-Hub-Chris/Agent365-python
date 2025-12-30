@@ -142,7 +142,7 @@ class TestMcpToolServerConfigurationService:
     def test_parse_gateway_server_config_without_custom_url(self, mock_build_url, service):
         """Test parsing gateway config without custom URL."""
         mock_build_url.return_value = "https://default.server/agents/servers/gateway_server"
-        
+
         server_element = {
             "mcpServerName": "GatewayServer",
             "mcpServerUniqueName": "gateway_server",
