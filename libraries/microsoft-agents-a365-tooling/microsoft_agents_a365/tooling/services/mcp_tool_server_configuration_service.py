@@ -501,9 +501,7 @@ class McpToolServerConfigurationService:
         Returns:
             Server URL string or None.
         """
-        # Check for 'mcpServerUrl' (manifest) or 'url' (gateway)
-        if "mcpServerUrl" in server_element and isinstance(server_element["mcpServerUrl"], str):
-            return server_element["mcpServerUrl"]
+        # Check for 'url' field in both manifest and gateway responses
         if "url" in server_element and isinstance(server_element["url"], str):
             return server_element["url"]
         return None

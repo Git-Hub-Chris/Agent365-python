@@ -72,22 +72,17 @@ class TestMcpToolServerConfigurationService:
                 {
                     "mcpServerName": "TestServer2",
                     "mcpServerUniqueName": "test_server_2",
-                    "mcpServerUrl": "https://custom.server.com/mcp",
+                    "url": "https://custom.server.com/mcp",
                 },
             ]
         }
 
     def test_extract_server_url_from_manifest(self, service):
         """Test extracting custom URL from manifest element."""
-        # Test with mcpServerUrl field
-        element = {"mcpServerUrl": "https://custom.url.com"}
+        # Test with url field
+        element = {"url": "https://custom.url.com"}
         url = service._extract_server_url(element)
         assert url == "https://custom.url.com"
-
-        # Test with url field
-        element = {"url": "https://another.url.com"}
-        url = service._extract_server_url(element)
-        assert url == "https://another.url.com"
 
         # Test with no URL
         element = {}
@@ -99,7 +94,7 @@ class TestMcpToolServerConfigurationService:
         server_element = {
             "mcpServerName": "CustomServer",
             "mcpServerUniqueName": "custom_server",
-            "mcpServerUrl": "https://my.custom.server/mcp",
+            "url": "https://my.custom.server/mcp",
         }
 
         config = service._parse_manifest_server_config(server_element)
