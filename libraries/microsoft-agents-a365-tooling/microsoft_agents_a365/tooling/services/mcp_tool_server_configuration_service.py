@@ -398,10 +398,18 @@ class McpToolServerConfigurationService:
             if not self._validate_server_strings(name, server_name):
                 return None
 
-            # Construct full URL using environment utilities
-            full_url = build_mcp_server_url(server_name)
+            # Check if a custom URL is provided
+            custom_url = self._extract_server_url(server_element)
 
-            return MCPServerConfig(mcp_server_name=name, mcp_server_unique_name=full_url)
+            # If custom URL is provided, use it directly; otherwise construct from base URL
+            if custom_url and custom_url.strip():
+                return MCPServerConfig(
+                    mcp_server_name=name, mcp_server_unique_name=server_name, url=custom_url
+                )
+            else:
+                # Construct full URL using environment utilities
+                full_url = build_mcp_server_url(server_name)
+                return MCPServerConfig(mcp_server_name=name, mcp_server_unique_name=full_url)
 
         except Exception:
             return None
@@ -425,7 +433,16 @@ class McpToolServerConfigurationService:
             if not self._validate_server_strings(name, endpoint):
                 return None
 
-            return MCPServerConfig(mcp_server_name=name, mcp_server_unique_name=endpoint)
+            # Check if a custom URL is provided by the gateway
+            custom_url = self._extract_server_url(server_element)
+
+            # If custom URL is provided, use it; otherwise use the endpoint as-is
+            if custom_url and custom_url.strip():
+                return MCPServerConfig(
+                    mcp_server_name=name, mcp_server_unique_name=endpoint, url=custom_url
+                )
+            else:
+                return MCPServerConfig(mcp_server_name=name, mcp_server_unique_name=endpoint)
 
         except Exception:
             return None
@@ -478,6 +495,23 @@ class McpToolServerConfigurationService:
             server_element["mcpServerUniqueName"], str
         ):
             return server_element["mcpServerUniqueName"]
+        return None
+
+    def _extract_server_url(self, server_element: Dict[str, Any]) -> Optional[str]:
+        """
+        Extracts custom server URL from configuration element.
+
+        Args:
+            server_element: Configuration dictionary.
+
+        Returns:
+            Server URL string or None.
+        """
+        # Check for 'mcpServerUrl' (manifest) or 'url' (gateway)
+        if "mcpServerUrl" in server_element and isinstance(server_element["mcpServerUrl"], str):
+            return server_element["mcpServerUrl"]
+        if "url" in server_element and isinstance(server_element["url"], str):
+            return server_element["url"]
         return None
 
     def _validate_server_strings(self, name: Optional[str], unique_name: Optional[str]) -> bool:

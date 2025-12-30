@@ -101,9 +101,13 @@ class McpToolRegistrationService:
         # Convert MCP server configs to MCPServerInfo objects
         mcp_servers_info = []
         for server_config in mcp_server_configs:
+            # Use custom URL if provided, otherwise use the unique name
+            server_url = (
+                server_config.url if server_config.url else server_config.mcp_server_unique_name
+            )
             server_info = MCPServerInfo(
                 name=server_config.mcp_server_name,
-                url=server_config.mcp_server_unique_name,
+                url=server_url,
             )
             mcp_servers_info.append(server_info)
 

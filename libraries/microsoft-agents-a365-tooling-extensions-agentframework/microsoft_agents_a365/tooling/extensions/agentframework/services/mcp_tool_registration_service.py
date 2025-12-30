@@ -97,9 +97,8 @@ class McpToolRegistrationService:
             # Add servers as MCPStreamableHTTPTool instances
             for config in server_configs:
                 try:
-                    server_url = getattr(config, "server_url", None) or getattr(
-                        config, "mcp_server_unique_name", None
-                    )
+                    # Use custom URL if provided, otherwise use the unique name
+                    server_url = config.url if config.url else config.mcp_server_unique_name
                     if not server_url:
                         self._logger.warning(f"MCP server config missing server_url: {config}")
                         continue
@@ -115,7 +114,7 @@ class McpToolRegistrationService:
                         self._orchestrator_name
                     )
 
-                    server_name = getattr(config, "mcp_server_name", "Unknown")
+                    server_name = config.mcp_server_name
 
                     # Create and configure MCPStreamableHTTPTool
                     mcp_tools = MCPStreamableHTTPTool(
@@ -134,7 +133,7 @@ class McpToolRegistrationService:
                     self._logger.info(f"Added MCP plugin '{server_name}' to agent tools")
 
                 except Exception as tool_ex:
-                    server_name = getattr(config, "mcp_server_name", "Unknown")
+                    server_name = config.mcp_server_name if hasattr(config, "mcp_server_name") else "Unknown"
                     self._logger.warning(
                         f"Failed to create MCP plugin for {server_name}: {tool_ex}"
                     )

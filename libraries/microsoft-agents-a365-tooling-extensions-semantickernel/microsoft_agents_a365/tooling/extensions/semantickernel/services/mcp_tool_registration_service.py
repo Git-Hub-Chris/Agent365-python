@@ -125,9 +125,12 @@ class McpToolRegistrationService:
                     self._orchestrator_name
                 )
 
+                # Use custom URL if provided, otherwise use the unique name
+                server_url = server.url if server.url else server.mcp_server_unique_name
+
                 plugin = MCPStreamableHttpPlugin(
                     name=server.mcp_server_name,
-                    url=server.mcp_server_unique_name,
+                    url=server_url,
                     headers=headers,
                 )
 
