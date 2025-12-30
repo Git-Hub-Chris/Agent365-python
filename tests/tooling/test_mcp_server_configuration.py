@@ -138,20 +138,24 @@ class TestMcpToolServerConfigurationService:
         assert config.mcp_server_unique_name == "gateway_server_endpoint"
         assert config.url == "https://gateway.custom.url/mcp"
 
-    def test_parse_gateway_server_config_without_custom_url(self, service):
+    @patch("microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service.build_mcp_server_url")
+    def test_parse_gateway_server_config_without_custom_url(self, mock_build_url, service):
         """Test parsing gateway config without custom URL."""
+        mock_build_url.return_value = "https://default.server/agents/servers/gateway_server"
+        
         server_element = {
             "mcpServerName": "GatewayServer",
-            "mcpServerUniqueName": "https://gateway.default/endpoint",
+            "mcpServerUniqueName": "gateway_server",
         }
 
         config = service._parse_gateway_server_config(server_element)
 
         assert config is not None
         assert config.mcp_server_name == "GatewayServer"
-        assert config.mcp_server_unique_name == "https://gateway.default/endpoint"
-        # Without a custom URL, the endpoint is used as the url
-        assert config.url == "https://gateway.default/endpoint"
+        assert config.mcp_server_unique_name == "gateway_server"
+        # Without a custom URL, build_mcp_server_url constructs the full URL and stores it in the url field
+        assert config.url == "https://default.server/agents/servers/gateway_server"
+        mock_build_url.assert_called_once_with("gateway_server")
 
     @patch.dict(os.environ, {"ENVIRONMENT": "Development"})
     def test_is_development_scenario(self, service):
