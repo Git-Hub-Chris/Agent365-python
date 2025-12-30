@@ -133,9 +133,8 @@ class McpToolRegistrationService:
                     self._logger.info(f"Added MCP plugin '{server_name}' to agent tools")
 
                 except Exception as tool_ex:
-                    server_name = config.mcp_server_name if hasattr(config, "mcp_server_name") else "Unknown"
                     self._logger.warning(
-                        f"Failed to create MCP plugin for {server_name}: {tool_ex}"
+                        f"Failed to create MCP plugin for {config.mcp_server_name}: {tool_ex}"
                     )
                     continue
 
