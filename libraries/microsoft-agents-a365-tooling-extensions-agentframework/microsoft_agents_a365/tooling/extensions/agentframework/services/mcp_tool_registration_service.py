@@ -96,6 +96,9 @@ class McpToolRegistrationService:
 
             # Add servers as MCPStreamableHTTPTool instances
             for config in server_configs:
+                # Use mcp_server_name if available, otherwise fall back to mcp_server_unique_name
+                server_name = config.mcp_server_name or config.mcp_server_unique_name
+                
                 try:
                     # Prepare auth headers
                     headers = {}
@@ -107,9 +110,6 @@ class McpToolRegistrationService:
                     headers[Constants.Headers.USER_AGENT] = Utility.get_user_agent_header(
                         self._orchestrator_name
                     )
-
-                    # Use mcp_server_name if available, otherwise fall back to mcp_server_unique_name
-                    server_name = config.mcp_server_name or config.mcp_server_unique_name
 
                     # Create and configure MCPStreamableHTTPTool
                     mcp_tools = MCPStreamableHTTPTool(
@@ -129,7 +129,7 @@ class McpToolRegistrationService:
 
                 except Exception as tool_ex:
                     self._logger.warning(
-                        f"Failed to create MCP plugin for {config.mcp_server_name}: {tool_ex}"
+                        f"Failed to create MCP plugin for {server_name}: {tool_ex}"
                     )
                     continue
 
