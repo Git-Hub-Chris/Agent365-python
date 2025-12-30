@@ -128,8 +128,11 @@ class McpToolRegistrationService:
                 # Use the URL from server (always populated by the configuration service)
                 server_url = server.url
 
+                # Use mcp_server_name if available (not None or empty), otherwise fall back to mcp_server_unique_name
+                server_name = server.mcp_server_name or server.mcp_server_unique_name
+
                 plugin = MCPStreamableHttpPlugin(
-                    name=server.mcp_server_name,
+                    name=server_name,
                     url=server_url,
                     headers=headers,
                 )

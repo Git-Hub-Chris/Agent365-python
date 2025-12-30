@@ -392,20 +392,20 @@ class McpToolServerConfigurationService:
             MCPServerConfig object or None if parsing fails.
         """
         try:
-            name = self._extract_server_name(server_element)
-            server_name = self._extract_server_unique_name(server_element)
+            mcp_server_name = self._extract_server_name(server_element)
+            mcp_server_unique_name = self._extract_server_unique_name(server_element)
 
-            if not self._validate_server_strings(name, server_name):
+            if not self._validate_server_strings(mcp_server_name, mcp_server_unique_name):
                 return None
 
-            # Check if a custom URL is provided
+            # Check if a URL is provided
             endpoint = self._extract_server_url(server_element)
 
             # Determine the final URL: use custom URL if provided, otherwise construct it
-            final_url = endpoint if endpoint else build_mcp_server_url(server_name)
+            final_url = endpoint if endpoint else build_mcp_server_url(mcp_server_unique_name)
 
             return MCPServerConfig(
-                mcp_server_name=name, mcp_server_unique_name=server_name, url=final_url
+                mcp_server_name=mcp_server_name, mcp_server_unique_name=mcp_server_unique_name, url=final_url
             )
 
         except Exception:
@@ -424,19 +424,19 @@ class McpToolServerConfigurationService:
             MCPServerConfig object or None if parsing fails.
         """
         try:
-            name = self._extract_server_name(server_element)
+            mcp_server_name = self._extract_server_name(server_element)
             mcp_server_unique_name = self._extract_server_unique_name(server_element)
 
-            if not self._validate_server_strings(name, mcp_server_unique_name):
+            if not self._validate_server_strings(mcp_server_name, mcp_server_unique_name):
                 return None
 
-            # Check if a custom URL is provided by the gateway
+            # Check if a URL is provided by the gateway
             endpoint = self._extract_server_url(server_element)
 
             # Determine the final URL: use custom URL if provided, otherwise construct it
             final_url = endpoint if endpoint else build_mcp_server_url(mcp_server_unique_name)
 
-            return MCPServerConfig(mcp_server_name=name, mcp_server_unique_name=mcp_server_unique_name, url=final_url)
+            return MCPServerConfig(mcp_server_name=mcp_server_name, mcp_server_unique_name=mcp_server_unique_name, url=final_url)
 
         except Exception:
             return None
