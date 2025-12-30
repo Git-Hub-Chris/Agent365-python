@@ -123,7 +123,7 @@ class TestMcpToolServerConfigurationService:
 
         assert config is not None
         assert config.mcp_server_name == "DefaultServer"
-        # When no custom URL, the built URL goes into mcp_server_unique_name
+        # Without a custom URL, build_mcp_server_url constructs the full URL and stores it in mcp_server_unique_name
         assert config.mcp_server_unique_name == "https://default.server/agents/servers/test_server"
         mock_build_url.assert_called_once_with("test_server")
 
