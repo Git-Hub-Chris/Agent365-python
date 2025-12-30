@@ -178,8 +178,8 @@ class McpToolRegistrationService:
                 else server.mcp_server_name
             )
 
-            # Use custom URL if provided, otherwise use the unique name
-            server_url = server.url if server.url else server.mcp_server_unique_name
+            # Use the URL from server (always populated by the configuration service)
+            server_url = server.url
 
             # Create MCP tool using Azure Foundry SDK
             mcp_tool = McpTool(server_label=server_label, server_url=server_url)

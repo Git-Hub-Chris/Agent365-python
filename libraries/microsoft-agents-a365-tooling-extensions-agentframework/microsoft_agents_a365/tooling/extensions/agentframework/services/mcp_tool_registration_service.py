@@ -97,8 +97,8 @@ class McpToolRegistrationService:
             # Add servers as MCPStreamableHTTPTool instances
             for config in server_configs:
                 try:
-                    # Use custom URL if provided, otherwise use the unique name
-                    server_url = config.url if config.url else config.mcp_server_unique_name
+                    # Use the URL from config (always populated by the configuration service)
+                    server_url = config.url
                     if not server_url:
                         self._logger.warning(f"MCP server config missing server_url: {config}")
                         continue
@@ -114,7 +114,7 @@ class McpToolRegistrationService:
                         self._orchestrator_name
                     )
 
-                    server_name = config.mcp_server_name
+                    server_name = config.mcp_server_name if config.mcp_server_name else config.mcp_server_unique_name
 
                     # Create and configure MCPStreamableHTTPTool
                     mcp_tools = MCPStreamableHTTPTool(
