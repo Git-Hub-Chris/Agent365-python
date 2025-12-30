@@ -141,7 +141,7 @@ class McpToolRegistrationService:
                 await plugin.connect()
 
                 # Add plugin to kernel
-                kernel.add_plugin(plugin, server.mcp_server_name)
+                kernel.add_plugin(plugin, server_name)
 
                 # Store reference to keep plugin alive throughout application lifecycle
                 # By storing plugin references in _connected_plugins, we prevent Python's garbage collector from cleaning up the plugin objects
