@@ -98,7 +98,7 @@ class McpToolRegistrationService:
             for config in server_configs:
                 # Use mcp_server_name if available (not None or empty), otherwise fall back to mcp_server_unique_name
                 server_name = config.mcp_server_name or config.mcp_server_unique_name
-                
+
                 try:
                     # Prepare auth headers
                     headers = {}

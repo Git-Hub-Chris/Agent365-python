@@ -408,7 +408,9 @@ class McpToolServerConfigurationService:
             final_url = endpoint if endpoint else build_mcp_server_url(server_name)
 
             return MCPServerConfig(
-                mcp_server_name=mcp_server_name, mcp_server_unique_name=mcp_server_unique_name, url=final_url
+                mcp_server_name=mcp_server_name,
+                mcp_server_unique_name=mcp_server_unique_name,
+                url=final_url,
             )
 
         except Exception:
@@ -442,7 +444,11 @@ class McpToolServerConfigurationService:
             # Determine the final URL: use custom URL if provided, otherwise construct it
             final_url = endpoint if endpoint else build_mcp_server_url(server_name)
 
-            return MCPServerConfig(mcp_server_name=mcp_server_name, mcp_server_unique_name=mcp_server_unique_name, url=final_url)
+            return MCPServerConfig(
+                mcp_server_name=mcp_server_name,
+                mcp_server_unique_name=mcp_server_unique_name,
+                url=final_url,
+            )
 
         except Exception:
             return None

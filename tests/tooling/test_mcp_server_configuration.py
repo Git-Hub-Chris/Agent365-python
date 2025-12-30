@@ -104,7 +104,9 @@ class TestMcpToolServerConfigurationService:
         assert config.mcp_server_unique_name == "custom_server"
         assert config.url == "https://my.custom.server/mcp"
 
-    @patch("microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service.build_mcp_server_url")
+    @patch(
+        "microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service.build_mcp_server_url"
+    )
     def test_parse_manifest_server_config_without_custom_url(self, mock_build_url, service):
         """Test parsing manifest config without custom URL constructs URL."""
         mock_build_url.return_value = "https://default.server/agents/servers/DefaultServer"
@@ -139,7 +141,9 @@ class TestMcpToolServerConfigurationService:
         assert config.mcp_server_unique_name == "gateway_server_endpoint"
         assert config.url == "https://gateway.custom.url/mcp"
 
-    @patch("microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service.build_mcp_server_url")
+    @patch(
+        "microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service.build_mcp_server_url"
+    )
     def test_parse_gateway_server_config_without_custom_url(self, mock_build_url, service):
         """Test parsing gateway config without custom URL."""
         mock_build_url.return_value = "https://default.server/agents/servers/GatewayServer"
@@ -190,7 +194,9 @@ class TestMcpToolServerConfigurationService:
         assert servers == mock_servers
         mock_load_manifest.assert_called_once()
 
-    @patch("microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service.get_tooling_gateway_for_digital_worker")
+    @patch(
+        "microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service.get_tooling_gateway_for_digital_worker"
+    )
     @patch.dict(os.environ, {"ENVIRONMENT": "Production"})
     @pytest.mark.asyncio
     async def test_list_tool_servers_production_with_custom_url(self, mock_gateway_url, service):
