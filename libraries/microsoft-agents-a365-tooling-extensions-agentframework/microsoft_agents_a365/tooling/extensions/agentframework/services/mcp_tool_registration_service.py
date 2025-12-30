@@ -108,7 +108,7 @@ class McpToolRegistrationService:
                         self._orchestrator_name
                     )
 
-                    server_name = config.mcp_server_name if config.mcp_server_name else config.mcp_server_unique_name
+                    server_name = config.mcp_server_name or config.mcp_server_unique_name
 
                     # Create and configure MCPStreamableHTTPTool
                     mcp_tools = MCPStreamableHTTPTool(
