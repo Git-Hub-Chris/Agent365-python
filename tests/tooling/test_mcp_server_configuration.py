@@ -107,7 +107,7 @@ class TestMcpToolServerConfigurationService:
     @patch("microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service.build_mcp_server_url")
     def test_parse_manifest_server_config_without_custom_url(self, mock_build_url, service):
         """Test parsing manifest config without custom URL constructs URL."""
-        mock_build_url.return_value = "https://default.server/agents/servers/test_server"
+        mock_build_url.return_value = "https://default.server/agents/servers/DefaultServer"
 
         server_element = {
             "mcpServerName": "DefaultServer",
@@ -120,8 +120,9 @@ class TestMcpToolServerConfigurationService:
         assert config.mcp_server_name == "DefaultServer"
         assert config.mcp_server_unique_name == "test_server"
         # Without a custom URL, build_mcp_server_url constructs the full URL and stores it in the url field
-        assert config.url == "https://default.server/agents/servers/test_server"
-        mock_build_url.assert_called_once_with("test_server")
+        # Uses mcp_server_name if available, otherwise falls back to mcp_server_unique_name
+        assert config.url == "https://default.server/agents/servers/DefaultServer"
+        mock_build_url.assert_called_once_with("DefaultServer")
 
     def test_parse_gateway_server_config_with_custom_url(self, service):
         """Test parsing gateway config with custom URL."""
@@ -141,7 +142,7 @@ class TestMcpToolServerConfigurationService:
     @patch("microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service.build_mcp_server_url")
     def test_parse_gateway_server_config_without_custom_url(self, mock_build_url, service):
         """Test parsing gateway config without custom URL."""
-        mock_build_url.return_value = "https://default.server/agents/servers/gateway_server"
+        mock_build_url.return_value = "https://default.server/agents/servers/GatewayServer"
 
         server_element = {
             "mcpServerName": "GatewayServer",
@@ -154,8 +155,9 @@ class TestMcpToolServerConfigurationService:
         assert config.mcp_server_name == "GatewayServer"
         assert config.mcp_server_unique_name == "gateway_server"
         # Without a custom URL, build_mcp_server_url constructs the full URL and stores it in the url field
-        assert config.url == "https://default.server/agents/servers/gateway_server"
-        mock_build_url.assert_called_once_with("gateway_server")
+        # Uses mcp_server_name if available, otherwise falls back to mcp_server_unique_name
+        assert config.url == "https://default.server/agents/servers/GatewayServer"
+        mock_build_url.assert_called_once_with("GatewayServer")
 
     @patch.dict(os.environ, {"ENVIRONMENT": "Development"})
     def test_is_development_scenario(self, service):
