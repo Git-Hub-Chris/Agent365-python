@@ -402,7 +402,7 @@ class McpToolServerConfigurationService:
             custom_url = self._extract_server_url(server_element)
 
             # If custom URL is provided, use it directly; otherwise construct from base URL
-            if custom_url and custom_url.strip():
+            if custom_url:
                 return MCPServerConfig(
                     mcp_server_name=name, mcp_server_unique_name=server_name, url=custom_url
                 )
@@ -437,7 +437,7 @@ class McpToolServerConfigurationService:
             custom_url = self._extract_server_url(server_element)
 
             # If custom URL is provided, use it; otherwise use the endpoint as-is
-            if custom_url and custom_url.strip():
+            if custom_url:
                 return MCPServerConfig(
                     mcp_server_name=name, mcp_server_unique_name=endpoint, url=custom_url
                 )
