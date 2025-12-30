@@ -108,6 +108,7 @@ class McpToolRegistrationService:
                         self._orchestrator_name
                     )
 
+                    # Use mcp_server_name if available, otherwise fall back to mcp_server_unique_name
                     server_name = config.mcp_server_name or config.mcp_server_unique_name
 
                     # Create and configure MCPStreamableHTTPTool
