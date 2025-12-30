@@ -96,7 +96,7 @@ class McpToolRegistrationService:
 
             # Add servers as MCPStreamableHTTPTool instances
             for config in server_configs:
-                # Use mcp_server_name if available, otherwise fall back to mcp_server_unique_name
+                # Use mcp_server_name if available (not None or empty), otherwise fall back to mcp_server_unique_name
                 server_name = config.mcp_server_name or config.mcp_server_unique_name
                 
                 try:
