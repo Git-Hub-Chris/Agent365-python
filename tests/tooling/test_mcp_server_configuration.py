@@ -8,7 +8,6 @@ import os
 from typing import Dict, Any
 from unittest.mock import patch, AsyncMock, MagicMock
 import pytest
-import aiohttp
 
 from microsoft_agents_a365.tooling.services.mcp_tool_server_configuration_service import (
     McpToolServerConfigurationService,
