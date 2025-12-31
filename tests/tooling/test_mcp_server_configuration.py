@@ -6,7 +6,7 @@
 import json
 import os
 from typing import Dict, Any
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock, MagicMock
 import pytest
 import aiohttp
 
