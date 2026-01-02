@@ -96,6 +96,13 @@ class TelemetryManager:
     ) -> bool:
         """Internal configuration method - not thread-safe, must be called with lock."""
 
+        # Check if a365 observability is already configured
+        if self._tracer_provider is not None:
+            self._logger.warning(
+                "a365 observability already configured. Ignoring repeated configure() call. "
+            )
+            return True
+
         # Create resource with service information
         resource = Resource.create(
             {
@@ -104,23 +111,24 @@ class TelemetryManager:
             }
         )
 
-        # Get existing tracer provider or create new one
-        try:
-            tracer_provider = trace.get_tracer_provider()
-            # Check if it's already configured
-            if hasattr(tracer_provider, "resource") and tracer_provider.resource:
-                # Already configured, just add our span processor
-                agent_processor = SpanProcessor()
-                tracer_provider.add_span_processor(agent_processor)
-                self._tracer_provider = tracer_provider
-                self._span_processors["agent"] = agent_processor
-                return True
-        except Exception:
-            pass
+        # Check if there's an existing TracerProvider (from app's OTEL setup)
+        tracer_provider = trace.get_tracer_provider()
 
-        # Configure tracer provider
-        tracer_provider = TracerProvider(resource=resource)
-        trace.set_tracer_provider(tracer_provider)
+        # Determine if we should use existing provider or create new one
+        # Check if it's a real TracerProvider with a resource (not a proxy/no-op)
+        if hasattr(tracer_provider, "resource") and tracer_provider.resource:
+            # Use existing provider from application's OTEL setup
+            self._logger.info(
+                "Detected existing TracerProvider with resource. "
+                "Adding a365 observability processors to it."
+            )
+        else:
+            # Create new TracerProvider with our resource
+            self._logger.info("Creating new TracerProvider for a365 observability.")
+            tracer_provider = TracerProvider(resource=resource)
+            trace.set_tracer_provider(tracer_provider)
+
+        # Store reference
         self._tracer_provider = tracer_provider
 
         # Use exporter_options if provided, otherwise create default options with legacy parameters
