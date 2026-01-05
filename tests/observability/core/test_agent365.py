@@ -61,13 +61,13 @@ class TestAgent365Configure(unittest.TestCase):
         )
         self.assertTrue(result, "configure() should return True with exporter_options")
 
-    @patch("microsoft_agents_a365.observability.core.config.Agent365Exporter")
+    @patch("microsoft_agents_a365.observability.core.config._Agent365Exporter")
     @patch("microsoft_agents_a365.observability.core.config.BatchSpanProcessor")
     @patch("microsoft_agents_a365.observability.core.config.is_agent365_exporter_enabled")
     def test_batch_span_processor_and_exporter_called_with_correct_values(
         self, mock_is_enabled, mock_batch_processor, mock_exporter
     ):
-        """Test that BatchSpanProcessor and Agent365Exporter are called with correct values from exporter_options."""
+        """Test that BatchSpanProcessor and _Agent365Exporter are called with correct values from exporter_options."""
         # Enable Agent365 exporter for this test
         mock_is_enabled.return_value = True
 

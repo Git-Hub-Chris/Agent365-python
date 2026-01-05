@@ -10,7 +10,7 @@ from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_NAMESPACE, Resourc
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
-from .exporters.agent365_exporter import Agent365Exporter
+from .exporters.agent365_exporter import _Agent365Exporter
 from .exporters.agent365_exporter_options import Agent365ExporterOptions
 from .exporters.utils import is_agent365_exporter_enabled
 from .trace_processor.span_processor import SpanProcessor
@@ -147,7 +147,7 @@ class TelemetryManager:
         }
 
         if is_agent365_exporter_enabled() and exporter_options.token_resolver is not None:
-            exporter = Agent365Exporter(
+            exporter = _Agent365Exporter(
                 token_resolver=exporter_options.token_resolver,
                 cluster_category=exporter_options.cluster_category,
                 use_s2s_endpoint=exporter_options.use_s2s_endpoint,

@@ -9,7 +9,7 @@ import logging
 import threading
 import time
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, final
 
 import requests
 from microsoft_agents_a365.runtime.power_platform_api_discovery import PowerPlatformApiDiscovery
@@ -36,7 +36,8 @@ DEFAULT_MAX_RETRIES = 3
 logger = logging.getLogger(__name__)
 
 
-class Agent365Exporter(SpanExporter):
+@final
+class _Agent365Exporter(SpanExporter):
     """
     Agent 365 span exporter for Agent 365:
       * Partitions spans by (tenantId, agentId)
