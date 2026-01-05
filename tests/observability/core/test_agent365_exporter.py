@@ -372,6 +372,18 @@ class TestAgent365Exporter(unittest.TestCase):
             "No spans with tenant/agent identity found; nothing exported."
         )
 
+    def test_exporter_is_internal(self):
+        """Test that _Agent365Exporter is marked as internal/private.
+
+        The underscore prefix convention indicates this class is internal to the SDK
+        and should not be instantiated directly by developers.
+        """
+
+        self.assertTrue(
+            _Agent365Exporter.__name__.startswith("_"),
+            "Exporter class should be prefixed with underscore to indicate it's private/internal",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
