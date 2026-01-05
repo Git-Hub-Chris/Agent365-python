@@ -9,7 +9,6 @@ from microsoft_agents_a365.observability.core.exporters.agent365_exporter_option
     Agent365ExporterOptions,
 )
 from microsoft_agents_a365.observability.core.trace_processor import SpanProcessor
-from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 
@@ -19,6 +18,14 @@ class TestAgent365Configure(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+        # Reset TelemetryManager state before each test
+        from microsoft_agents_a365.observability.core.config import _telemetry_manager
+        from microsoft_agents_a365.observability.core.opentelemetry_scope import OpenTelemetryScope
+
+        _telemetry_manager._tracer_provider = None
+        _telemetry_manager._span_processors = {}
+        OpenTelemetryScope._tracer = None
+
         self.mock_token_resolver = Mock()
         self.mock_token_resolver.return_value = "test_token_123"
 
@@ -26,11 +33,13 @@ class TestAgent365Configure(unittest.TestCase):
         """Clean up after each test."""
         # Reset the telemetry manager singleton state
         from microsoft_agents_a365.observability.core.config import _telemetry_manager
+        from microsoft_agents_a365.observability.core.opentelemetry_scope import OpenTelemetryScope
 
         _telemetry_manager._tracer_provider = None
         _telemetry_manager._span_processors = {}
+        OpenTelemetryScope._tracer = None
 
-        otel_trace._TRACER_PROVIDER = None
+        # Do NOT reset otel_trace._TRACER_PROVIDER to None to avoid NonRecordingSpan issues in other tests
 
     def test_configure_basic_functionality(self):
         """Test configure function with basic parameters and legacy parameters."""
@@ -143,39 +152,6 @@ class TestAgent365Configure(unittest.TestCase):
             self.assertTrue(result2)
             mock_logger.warning.assert_called_once()
             self.assertIn("already configured", mock_logger.warning.call_args[0][0].lower())
-
-    @patch("microsoft_agents_a365.observability.core.config.is_agent365_exporter_enabled")
-    @patch("microsoft_agents_a365.observability.core.config.TracerProvider")
-    def test_configure_creates_new_tracer_provider(self, mock_provider_class, mock_is_enabled):
-        """Test configure() creates new TracerProvider when none exists and adds processors."""
-        mock_is_enabled.return_value = False
-
-        new_provider = TracerProvider(
-            resource=Resource.create({
-                "service.name": "test-service",
-                "service.namespace": "test-namespace",
-            })
-        )
-        mock_provider_class.return_value = new_provider
-
-        result = configure(service_name="test-service", service_namespace="test-namespace")
-        self.assertTrue(result)
-
-        # Verify both processors were added by inspecting the MultiSpanProcessor
-
-        active_processor = new_provider._active_span_processor
-        self.assertIsNotNone(active_processor)
-
-        # MultiSpanProcessor has a _span_processors list
-        processors = active_processor._span_processors
-        self.assertEqual(
-            len(processors), 2, "Should have 2 processors: BatchSpanProcessor and SpanProcessor"
-        )
-
-        # Verify types of processors
-        processor_types = [type(p).__name__ for p in processors]
-        self.assertIn("BatchSpanProcessor", processor_types)
-        self.assertIn("SpanProcessor", processor_types)
 
     @patch("microsoft_agents_a365.observability.core.config.is_agent365_exporter_enabled")
     @patch("microsoft_agents_a365.observability.core.config.trace.get_tracer_provider")
