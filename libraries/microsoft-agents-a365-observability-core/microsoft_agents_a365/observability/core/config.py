@@ -116,7 +116,7 @@ class TelemetryManager:
 
         # Determine if we should use existing provider or create new one
         # Check if it's a real TracerProvider with a resource (not a proxy/no-op)
-        if hasattr(tracer_provider, "resource") and tracer_provider.resource:
+        if getattr(tracer_provider, "resource", None):
             # Use existing provider from application's OTEL setup
             self._logger.info(
                 "Detected existing TracerProvider with resource. "
