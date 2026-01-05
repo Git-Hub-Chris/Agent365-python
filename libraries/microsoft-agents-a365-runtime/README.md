@@ -13,7 +13,58 @@ pip install microsoft-agents-a365-runtime
 
 ## Usage
 
-For usage examples and detailed documentation, see the [Microsoft Agent 365 Developer documentation](https://learn.microsoft.com/microsoft-agent-365/developer/?tabs=python) on Microsoft Learn.
+### Agent Settings Service
+
+The Agent Settings Service provides methods to manage agent settings templates and instance-specific settings:
+
+```python
+import asyncio
+from microsoft_agents_a365.runtime import (
+    AgentSettingsService,
+    AgentSettingTemplate,
+    AgentSettings,
+    PowerPlatformApiDiscovery,
+)
+
+# Initialize the service
+api_discovery = PowerPlatformApiDiscovery("prod")
+tenant_id = "your-tenant-id"
+service = AgentSettingsService(api_discovery, tenant_id)
+
+async def main():
+    access_token = "your-access-token"
+    
+    # Get agent setting template by agent type
+    template = await service.get_agent_setting_template(
+        "my-agent-type",
+        access_token
+    )
+    
+    # Set agent setting template
+    new_template = AgentSettingTemplate(
+        agent_type="my-agent-type",
+        settings={"key1": "value1", "key2": "value2"}
+    )
+    await service.set_agent_setting_template(new_template, access_token)
+    
+    # Get agent settings by instance
+    settings = await service.get_agent_settings(
+        "agent-instance-id",
+        access_token
+    )
+    
+    # Set agent settings by instance
+    new_settings = AgentSettings(
+        agent_instance_id="agent-instance-id",
+        agent_type="my-agent-type",
+        settings={"instanceKey": "instanceValue"}
+    )
+    await service.set_agent_settings(new_settings, access_token)
+
+asyncio.run(main())
+```
+
+For more usage examples and detailed documentation, see the [Microsoft Agent 365 Developer documentation](https://learn.microsoft.com/microsoft-agent-365/developer/?tabs=python) on Microsoft Learn.
 
 ## Support
 
