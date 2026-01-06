@@ -1,6 +1,5 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-import builtins
 from typing import Any, TypeVar
 
 from microsoft_agents.activity import Activity
@@ -146,7 +145,7 @@ class AgentNotificationActivity:
         return self._notification_type
 
     # Generic escape hatch
-    def as_model(self, model: builtins.type[TModel]) -> TModel | None:
+    def as_model(self, model: type[TModel]) -> TModel | None:
         """Parse the activity value as a custom model type.
 
         This method provides a generic way to validate and parse the activity's value
