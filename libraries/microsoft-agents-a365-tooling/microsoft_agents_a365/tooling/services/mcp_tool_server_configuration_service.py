@@ -1,4 +1,5 @@
-# Copyright (c) Microsoft. All rights reserved.
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
 
 """
 MCP Tool Server Configuration Service.
@@ -500,22 +501,16 @@ class McpToolServerConfigurationService:
 
     async def send_chat_history(
         self,
-        conversation_id: str,
-        message_id: str,
-        user_message: str,
+        turn_context,
         chat_history_messages: List[ChatHistoryMessage],
-        auth_token: str,
         options: Optional[ToolOptions] = None,
     ):
         """
         Sends chat history to the MCP platform for real-time threat protection.
 
         Args:
-            conversation_id: The unique identifier for the conversation.
-            message_id: The unique identifier for the message within the conversation.
-            user_message: The content of the user's message.
+            turn_context: TurnContext from the Agents SDK containing conversation information.
             chat_history_messages: List of ChatHistoryMessage objects representing the chat history.
-            auth_token: Authentication token to access the MCP platform.
             options: Optional ToolOptions instance containing optional parameters.
 
         Returns:
@@ -531,16 +526,29 @@ class McpToolServerConfigurationService:
         from ..utils.utility import get_chat_history_endpoint
 
         # Validate input parameters
-        if not conversation_id:
-            raise ValueError("conversation_id cannot be empty or None")
-        if not message_id:
-            raise ValueError("message_id cannot be empty or None")
-        if not user_message:
-            raise ValueError("user_message cannot be empty or None")
+        if not turn_context:
+            raise ValueError("turn_context cannot be empty or None")
         if not chat_history_messages:
             raise ValueError("chat_history_messages cannot be empty or None")
-        if not auth_token:
-            raise ValueError("auth_token cannot be empty or None")
+
+        # Extract required information from turn context
+        if not turn_context.activity:
+            raise ValueError("turn_context.activity cannot be None")
+        
+        conversation_id = (
+            turn_context.activity.conversation.id
+            if turn_context.activity.conversation
+            else None
+        )
+        message_id = turn_context.activity.id
+        user_message = turn_context.activity.text
+
+        if not conversation_id:
+            raise ValueError("conversation_id cannot be empty or None (from turn_context.activity.conversation.id)")
+        if not message_id:
+            raise ValueError("message_id cannot be empty or None (from turn_context.activity.id)")
+        if not user_message:
+            raise ValueError("user_message cannot be empty or None (from turn_context.activity.text)")
 
         # Use default options if none provided
         if options is None:
@@ -560,9 +568,8 @@ class McpToolServerConfigurationService:
         )
 
         try:
-            # Prepare headers
+            # Prepare headers (no authentication required)
             headers = {
-                Constants.Headers.AUTHORIZATION: f"{Constants.Headers.BEARER_PREFIX} {auth_token}",
                 Constants.Headers.USER_AGENT: RuntimeUtility.get_user_agent_header(
                     options.orchestrator_name
                 ),

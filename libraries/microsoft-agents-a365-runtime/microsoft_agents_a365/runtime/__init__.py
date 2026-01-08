@@ -1,4 +1,5 @@
-# Copyright (c) Microsoft. All rights reserved.
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
 
 from .environment_utils import get_observability_authentication_scope
 from .operation_error import OperationError
