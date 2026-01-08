@@ -24,13 +24,11 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional
 
 # Third-party imports
 import aiohttp
-
-if TYPE_CHECKING:
-    from microsoft_agents.hosting.core import TurnContext
+from microsoft_agents.hosting.core import TurnContext
 
 # Local imports
 from ..models import ChatHistoryMessage, MCPServerConfig, ToolOptions
@@ -504,7 +502,7 @@ class McpToolServerConfigurationService:
 
     async def send_chat_history(
         self,
-        turn_context: "TurnContext",
+        turn_context: TurnContext,
         chat_history_messages: List[ChatHistoryMessage],
         options: Optional[ToolOptions] = None,
     ):
