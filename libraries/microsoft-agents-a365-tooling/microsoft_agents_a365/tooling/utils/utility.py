@@ -89,3 +89,13 @@ def get_mcp_platform_authentication_scope():
         return [envScope]
 
     return [PROD_MCP_PLATFORM_AUTHENTICATION_SCOPE]
+
+
+def get_chat_history_endpoint() -> str:
+    """
+    Gets the chat history endpoint URL for sending chat history to the MCP platform.
+
+    Returns:
+        str: The chat history endpoint URL.
+    """
+    return f"{_get_mcp_platform_base_url()}/agents/real-time-threat-protection/chat-message"

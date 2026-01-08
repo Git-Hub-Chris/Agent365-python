@@ -17,6 +17,7 @@ The service supports both development and production scenarios:
 # ==============================================================================
 
 # Standard library imports
+import asyncio
 import json
 import logging
 import os
@@ -492,3 +493,112 @@ class McpToolServerConfigurationService:
             True if both strings are valid, False otherwise.
         """
         return name is not None and name.strip() and unique_name is not None and unique_name.strip()
+
+    # --------------------------------------------------------------------------
+    # SEND CHAT HISTORY
+    # --------------------------------------------------------------------------
+
+    async def send_chat_history(
+        self,
+        conversation_id: str,
+        message_id: str,
+        user_message: str,
+        chat_history_messages: List,
+        auth_token: str,
+        options: Optional[ToolOptions] = None,
+    ):
+        """
+        Sends chat history to the MCP platform for real-time threat protection.
+
+        Args:
+            conversation_id: The unique identifier for the conversation.
+            message_id: The unique identifier for the message within the conversation.
+            user_message: The content of the user's message.
+            chat_history_messages: List of ChatHistoryMessage objects representing the chat history.
+            auth_token: Authentication token to access the MCP platform.
+            options: Optional ToolOptions instance containing optional parameters.
+
+        Returns:
+            OperationResult: An OperationResult indicating success or failure.
+
+        Raises:
+            ValueError: If required parameters are invalid or empty.
+        """
+        # Import here to avoid circular dependency
+        from microsoft_agents_a365.runtime import OperationError, OperationResult
+
+        from ..models import ChatMessageRequest
+        from ..utils.utility import get_chat_history_endpoint
+
+        # Validate input parameters
+        if not conversation_id:
+            raise ValueError("conversation_id cannot be empty or None")
+        if not message_id:
+            raise ValueError("message_id cannot be empty or None")
+        if not user_message:
+            raise ValueError("user_message cannot be empty or None")
+        if not chat_history_messages:
+            raise ValueError("chat_history_messages cannot be empty or None")
+        if not auth_token:
+            raise ValueError("auth_token cannot be empty or None")
+
+        # Use default options if none provided
+        if options is None:
+            options = ToolOptions(orchestrator_name=None)
+
+        # Get the endpoint URL
+        endpoint = get_chat_history_endpoint()
+
+        self._logger.info(f"Sending chat history to endpoint: {endpoint}")
+
+        # Create the request payload
+        request = ChatMessageRequest(
+            conversation_id=conversation_id,
+            message_id=message_id,
+            user_message=user_message,
+            chat_history=chat_history_messages,
+        )
+
+        try:
+            # Prepare headers
+            headers = {
+                Constants.Headers.AUTHORIZATION: f"{Constants.Headers.BEARER_PREFIX} {auth_token}",
+                Constants.Headers.USER_AGENT: RuntimeUtility.get_user_agent_header(
+                    options.orchestrator_name
+                ),
+                "Content-Type": "application/json",
+            }
+
+            # Convert request to JSON
+            json_data = json.dumps(request.to_dict())
+
+            # Send POST request
+            async with aiohttp.ClientSession() as session:
+                async with session.post(endpoint, headers=headers, data=json_data) as response:
+                    if response.status == 200:
+                        self._logger.info("Successfully sent chat history to MCP platform")
+                        return OperationResult.success()
+                    else:
+                        error_text = await response.text()
+                        error_msg = f"HTTP {response.status}: {error_text}"
+                        self._logger.error(
+                            f"HTTP error sending chat history to '{endpoint}': {error_msg}"
+                        )
+                        return OperationResult.failed(
+                            OperationError(Exception(f"HTTP error: {error_msg}"))
+                        )
+
+        except aiohttp.ClientError as http_ex:
+            self._logger.error(
+                f"HTTP error sending chat history to '{endpoint}': {str(http_ex)}"
+            )
+            return OperationResult.failed(OperationError(http_ex))
+        except asyncio.TimeoutError as timeout_ex:
+            self._logger.error(
+                f"Request timeout sending chat history to '{endpoint}': {str(timeout_ex)}"
+            )
+            return OperationResult.failed(OperationError(timeout_ex))
+        except Exception as ex:
+            self._logger.error(f"Failed to send chat history to '{endpoint}': {str(ex)}")
+            return OperationResult.failed(OperationError(ex))
+
