@@ -535,21 +535,23 @@ class McpToolServerConfigurationService:
         # Extract required information from turn context
         if not turn_context.activity:
             raise ValueError("turn_context.activity cannot be None")
-        
+
         conversation_id = (
-            turn_context.activity.conversation.id
-            if turn_context.activity.conversation
-            else None
+            turn_context.activity.conversation.id if turn_context.activity.conversation else None
         )
         message_id = turn_context.activity.id
         user_message = turn_context.activity.text
 
         if not conversation_id:
-            raise ValueError("conversation_id cannot be empty or None (from turn_context.activity.conversation.id)")
+            raise ValueError(
+                "conversation_id cannot be empty or None (from turn_context.activity.conversation.id)"
+            )
         if not message_id:
             raise ValueError("message_id cannot be empty or None (from turn_context.activity.id)")
         if not user_message:
-            raise ValueError("user_message cannot be empty or None (from turn_context.activity.text)")
+            raise ValueError(
+                "user_message cannot be empty or None (from turn_context.activity.text)"
+            )
 
         # Use default options if none provided
         if options is None:
@@ -597,9 +599,7 @@ class McpToolServerConfigurationService:
                         )
 
         except aiohttp.ClientError as http_ex:
-            self._logger.error(
-                f"HTTP error sending chat history to '{endpoint}': {str(http_ex)}"
-            )
+            self._logger.error(f"HTTP error sending chat history to '{endpoint}': {str(http_ex)}")
             return OperationResult.failed(OperationError(http_ex))
         except asyncio.TimeoutError as timeout_ex:
             self._logger.error(
@@ -609,4 +609,3 @@ class McpToolServerConfigurationService:
         except Exception as ex:
             self._logger.error(f"Failed to send chat history to '{endpoint}': {str(ex)}")
             return OperationResult.failed(OperationError(ex))
-

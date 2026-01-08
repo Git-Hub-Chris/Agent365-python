@@ -129,15 +129,15 @@ class TestSendChatHistory:
         # Act & Assert
         with pytest.raises(ValueError, match="turn_context cannot be empty or None"):
             import asyncio
+
             asyncio.run(service.send_chat_history(None, chat_history_messages))
 
-    def test_send_chat_history_validates_chat_history_messages(
-        self, service, mock_turn_context
-    ):
+    def test_send_chat_history_validates_chat_history_messages(self, service, mock_turn_context):
         """Test that send_chat_history validates chat_history_messages parameter."""
         # Act & Assert
         with pytest.raises(ValueError, match="chat_history_messages cannot be empty or None"):
             import asyncio
+
             asyncio.run(service.send_chat_history(mock_turn_context, None))
 
     def test_send_chat_history_validates_activity(self, service, chat_history_messages):
@@ -149,6 +149,7 @@ class TestSendChatHistory:
         # Act & Assert
         with pytest.raises(ValueError, match="turn_context.activity cannot be None"):
             import asyncio
+
             asyncio.run(service.send_chat_history(mock_context, chat_history_messages))
 
     def test_send_chat_history_validates_conversation_id(self, service, chat_history_messages):
@@ -163,9 +164,11 @@ class TestSendChatHistory:
 
         # Act & Assert
         with pytest.raises(
-            ValueError, match="conversation_id cannot be empty or None.*turn_context.activity.conversation.id"
+            ValueError,
+            match="conversation_id cannot be empty or None.*turn_context.activity.conversation.id",
         ):
             import asyncio
+
             asyncio.run(service.send_chat_history(mock_context, chat_history_messages))
 
     def test_send_chat_history_validates_message_id(self, service, chat_history_messages):
@@ -185,6 +188,7 @@ class TestSendChatHistory:
             ValueError, match="message_id cannot be empty or None.*turn_context.activity.id"
         ):
             import asyncio
+
             asyncio.run(service.send_chat_history(mock_context, chat_history_messages))
 
     def test_send_chat_history_validates_user_message(self, service, chat_history_messages):
@@ -204,6 +208,7 @@ class TestSendChatHistory:
             ValueError, match="user_message cannot be empty or None.*turn_context.activity.text"
         ):
             import asyncio
+
             asyncio.run(service.send_chat_history(mock_context, chat_history_messages))
 
     @pytest.mark.asyncio
