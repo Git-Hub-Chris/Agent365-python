@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 
 # Local imports
-from ..models import MCPServerConfig, ToolOptions
+from ..models import ChatHistoryMessage, MCPServerConfig, ToolOptions
 from ..utils import Constants
 from ..utils.utility import get_tooling_gateway_for_digital_worker, build_mcp_server_url
 
@@ -503,7 +503,7 @@ class McpToolServerConfigurationService:
         conversation_id: str,
         message_id: str,
         user_message: str,
-        chat_history_messages: List,
+        chat_history_messages: List[ChatHistoryMessage],
         auth_token: str,
         options: Optional[ToolOptions] = None,
     ):
