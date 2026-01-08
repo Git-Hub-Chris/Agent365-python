@@ -3,7 +3,7 @@
 
 """Unit tests for send_chat_history method in McpToolServerConfigurationService."""
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -32,7 +32,7 @@ class TestSendChatHistory:
     @pytest.fixture
     def chat_history_messages(self):
         """Create sample chat history messages."""
-        timestamp = datetime.now(UTC)
+        timestamp = datetime.now(timezone.utc)
         return [
             ChatHistoryMessage("msg-1", "user", "Hello", timestamp),
             ChatHistoryMessage("msg-2", "assistant", "Hi there!", timestamp),
