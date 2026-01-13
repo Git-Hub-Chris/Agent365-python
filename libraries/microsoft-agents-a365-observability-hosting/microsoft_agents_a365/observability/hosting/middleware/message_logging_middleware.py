@@ -8,8 +8,10 @@ from microsoft_agents.activity import Activity
 from microsoft_agents.hosting.core.middleware_set import Middleware, TurnContext
 from microsoft_agents_a365.observability.core.agent_details import AgentDetails
 from microsoft_agents_a365.observability.core.execution_type import ExecutionType
+from microsoft_agents_a365.observability.core.models.response import Response
 from microsoft_agents_a365.observability.core.request import Request
 from microsoft_agents_a365.observability.core.spans_scopes.input_scope import InputScope
+from microsoft_agents_a365.observability.core.spans_scopes.output_scope import OutputScope
 from microsoft_agents_a365.observability.core.tenant_details import TenantDetails
 
 
@@ -32,7 +34,7 @@ class MessageLoggingMiddleware(Middleware):
             log_user_messages: Whether to log incoming user messages
             log_bot_messages: Whether to log outgoing bot messages
         """
-        self.logger = logger or logging.getLogger("agents. observability")
+        self.logger = logger or logging.getLogger("agents.observability")
         self.log_user_messages = log_user_messages
         self.log_bot_messages = log_bot_messages
 
@@ -43,12 +45,13 @@ class MessageLoggingMiddleware(Middleware):
         if self.log_user_messages and turn_context.activity.text:
             input_scope = self._create_input_scope(turn_context.activity)
             input_scope.__enter__()
-            self.logger.info(f"📥 User:  {turn_context.activity.text}")
+            self.logger.info(f"📥 User input message: {turn_context.activity.text}")
 
         try:
             # Hook into outgoing messages
             if self.log_bot_messages:
-                turn_context.on_send_activities(self._create_send_handler())
+                # Pass activity to handler so we can create agent/tenant details
+                turn_context.on_send_activities(self._create_send_handler(turn_context.activity))
 
             # Execute bot logic
             await logic()
@@ -86,14 +89,45 @@ class MessageLoggingMiddleware(Middleware):
 
         return InputScope.start(agent_details, tenant_details, request)
 
-    def _create_send_handler(self):
-        """Create handler for outgoing bot messages"""
+    def _create_send_handler(self, incoming_activity: Activity):
+        """Create handler for outgoing bot messages
+
+        Args:
+            incoming_activity: The incoming activity to extract agent/tenant details from
+        """
 
         async def send_handler(ctx, activities, next_send):
-            # Log each outgoing message
-            for activity in activities:
-                if activity.text:
-                    self.logger.info(f"📤 Bot: {activity.text}")
+            # Collect all outgoing message texts
+            messages = [activity.text for activity in activities if activity.text]
+
+            if messages:
+                # Create OutputScope as a child of the current InputScope
+                agent_details = AgentDetails(
+                    agent_id=incoming_activity.recipient.id
+                    if incoming_activity.recipient
+                    else "unknown",
+                    agent_name=incoming_activity.recipient.name
+                    if incoming_activity.recipient
+                    else None,
+                    conversation_id=incoming_activity.conversation.id
+                    if incoming_activity.conversation
+                    else None,
+                )
+
+                tenant_details = TenantDetails(
+                    tenant_id=incoming_activity.conversation.tenant_id
+                    if incoming_activity.conversation
+                    and hasattr(incoming_activity.conversation, "tenant_id")
+                    else "unknown"
+                )
+
+                response = Response(messages=messages)
+
+                # Use OutputScope within a context manager - it will be a child of InputScope
+                with OutputScope.start(agent_details, tenant_details, response):
+                    # Log each message
+                    for message in messages:
+                        self.logger.info(f"📤 Bot output message: {message}")
 
             return await next_send()
 
