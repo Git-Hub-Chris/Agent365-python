@@ -559,7 +559,7 @@ class McpToolServerConfigurationService:
         # Get the endpoint URL
         endpoint = get_chat_history_endpoint()
 
-        self._logger.info(f"Sending chat history to endpoint: {endpoint}")
+        self._logger.debug(f"Sending chat history to endpoint: {endpoint}")
 
         # Create the request payload
         request = ChatMessageRequest(
