@@ -88,4 +88,4 @@ class OperationResult:
             return "Succeeded"
         else:
             error_messages = ", ".join(str(error.message) for error in self._errors)
-            return f"Failed : {error_messages}"
+            return f"Failed: {error_messages}" if error_messages else "Failed"
