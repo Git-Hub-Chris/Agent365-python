@@ -1,4 +1,5 @@
-# Copyright (c) Microsoft. All rights reserved.
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
 
 """
 MCP Tool Server Configuration Service.
@@ -17,23 +18,42 @@ The service supports both development and production scenarios:
 # ==============================================================================
 
 # Standard library imports
+import asyncio
 import json
 import logging
 import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 # Third-party imports
 import aiohttp
+from microsoft_agents.hosting.core import TurnContext
 
 # Local imports
-from ..models import MCPServerConfig, ToolOptions
+from ..models import ChatHistoryMessage, ChatMessageRequest, MCPServerConfig, ToolOptions
 from ..utils import Constants
-from ..utils.utility import get_tooling_gateway_for_digital_worker, build_mcp_server_url
+from ..utils.utility import (
+    get_tooling_gateway_for_digital_worker,
+    build_mcp_server_url,
+    get_chat_history_endpoint,
+)
 
 # Runtime Imports
+from microsoft_agents_a365.runtime import OperationError, OperationResult
 from microsoft_agents_a365.runtime.utility import Utility as RuntimeUtility
+
+
+# ==============================================================================
+# CONSTANTS
+# ==============================================================================
+
+# HTTP timeout in seconds for request operations
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 30
+
+# HTTP status code for successful response
+HTTP_STATUS_OK = 200
 
 
 # ==============================================================================
@@ -530,3 +550,145 @@ class McpToolServerConfigurationService:
             True if both strings are valid, False otherwise.
         """
         return name is not None and name.strip() and unique_name is not None and unique_name.strip()
+
+    # --------------------------------------------------------------------------
+    # SEND CHAT HISTORY
+    # --------------------------------------------------------------------------
+
+    async def send_chat_history(
+        self,
+        turn_context: TurnContext,
+        chat_history_messages: List[ChatHistoryMessage],
+        options: Optional[ToolOptions] = None,
+    ) -> OperationResult:
+        """
+        Sends chat history to the MCP platform for real-time threat protection.
+
+        Args:
+            turn_context: TurnContext from the Agents SDK containing conversation information.
+                          Must have a valid activity with conversation.id, activity.id, and
+                          activity.text.
+            chat_history_messages: List of ChatHistoryMessage objects representing the chat
+                                   history. Must be non-empty.
+            options: Optional ToolOptions instance containing optional parameters.
+
+        Returns:
+            OperationResult: An OperationResult indicating success or failure.
+                             On success, returns OperationResult.success().
+                             On failure, returns OperationResult.failed() with error details.
+
+        Raises:
+            ValueError: If turn_context is None, chat_history_messages is None or empty,
+                        turn_context.activity is None, or any of the required fields
+                        (conversation.id, activity.id, activity.text) are missing or empty.
+
+        Example:
+            >>> from datetime import datetime, timezone
+            >>> from microsoft_agents_a365.tooling.models import ChatHistoryMessage
+            >>>
+            >>> history = [
+            ...     ChatHistoryMessage("msg-1", "user", "Hello", datetime.now(timezone.utc)),
+            ...     ChatHistoryMessage("msg-2", "assistant", "Hi!", datetime.now(timezone.utc))
+            ... ]
+            >>>
+            >>> service = McpToolServerConfigurationService()
+            >>> result = await service.send_chat_history(turn_context, history)
+            >>> if result.succeeded:
+            ...     print("Chat history sent successfully")
+        """
+        # Validate input parameters
+        if turn_context is None:
+            raise ValueError("turn_context cannot be None")
+        if chat_history_messages is None or len(chat_history_messages) == 0:
+            raise ValueError("chat_history_messages cannot be None or empty")
+
+        # Extract required information from turn context
+        if not turn_context.activity:
+            raise ValueError("turn_context.activity cannot be None")
+
+        conversation_id: Optional[str] = (
+            turn_context.activity.conversation.id if turn_context.activity.conversation else None
+        )
+        message_id: Optional[str] = turn_context.activity.id
+        user_message: Optional[str] = turn_context.activity.text
+
+        if conversation_id is None or (
+            isinstance(conversation_id, str) and not conversation_id.strip()
+        ):
+            raise ValueError(
+                "conversation_id cannot be empty or None (from turn_context.activity.conversation.id)"
+            )
+        if message_id is None or (isinstance(message_id, str) and not message_id.strip()):
+            raise ValueError("message_id cannot be empty or None (from turn_context.activity.id)")
+        if user_message is None or (isinstance(user_message, str) and not user_message.strip()):
+            raise ValueError(
+                "user_message cannot be empty or None (from turn_context.activity.text)"
+            )
+
+        # Use default options if none provided
+        if options is None:
+            options = ToolOptions(orchestrator_name=None)
+
+        # Get the endpoint URL
+        endpoint = get_chat_history_endpoint()
+
+        # Log only the URL path to avoid accidentally exposing sensitive data in query strings
+        parsed_url = urlparse(endpoint)
+        self._logger.debug(f"Sending chat history to endpoint path: {parsed_url.path}")
+
+        # Create the request payload
+        request = ChatMessageRequest(
+            conversation_id=conversation_id,
+            message_id=message_id,
+            user_message=user_message,
+            chat_history=chat_history_messages,
+        )
+
+        try:
+            # Prepare headers (no authentication required)
+            headers = {
+                Constants.Headers.USER_AGENT: RuntimeUtility.get_user_agent_header(
+                    options.orchestrator_name
+                ),
+                "Content-Type": "application/json",
+            }
+
+            # Convert request to JSON (using Pydantic's model_dump with aliases for camelCase)
+            json_data = json.dumps(request.model_dump(by_alias=True, mode="json"))
+
+            # Send POST request with timeout to prevent indefinite hangs
+            timeout = aiohttp.ClientTimeout(total=DEFAULT_REQUEST_TIMEOUT_SECONDS)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(endpoint, headers=headers, data=json_data) as response:
+                    if response.status == HTTP_STATUS_OK:
+                        self._logger.info("Successfully sent chat history to MCP platform")
+                        return OperationResult.success()
+                    else:
+                        error_text = await response.text()
+                        self._logger.error(
+                            f"HTTP error sending chat history: HTTP {response.status}. "
+                            f"Response: {error_text[:500]}"
+                        )
+                        # Use ClientResponseError for consistent error handling
+                        http_error = aiohttp.ClientResponseError(
+                            request_info=response.request_info,
+                            history=response.history,
+                            status=response.status,
+                            message=error_text,
+                            headers=response.headers,
+                        )
+                        return OperationResult.failed(OperationError(http_error))
+
+        except asyncio.TimeoutError as timeout_ex:
+            # Catch TimeoutError before ClientError since aiohttp.ServerTimeoutError
+            # inherits from both asyncio.TimeoutError and aiohttp.ClientError
+            self._logger.error(
+                f"Request timeout sending chat history to '{endpoint}': {str(timeout_ex)}"
+            )
+            return OperationResult.failed(OperationError(timeout_ex))
+        except aiohttp.ClientError as http_ex:
+            self._logger.error(f"HTTP error sending chat history to '{endpoint}': {str(http_ex)}")
+            return OperationResult.failed(OperationError(http_ex))
+        except Exception as ex:
+            self._logger.error(f"Failed to send chat history to '{endpoint}': {str(ex)}")
+            return OperationResult.failed(OperationError(ex))

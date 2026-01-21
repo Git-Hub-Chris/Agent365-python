@@ -2,12 +2,12 @@
 # Licensed under the MIT License.
 
 import os
-from pathlib import Path
 import sys
 import unittest
-import pytest
+from pathlib import Path
 from urllib.parse import urlparse
 
+import pytest
 from microsoft_agents_a365.observability.core import (
     AgentDetails,
     ExecutionType,
@@ -19,6 +19,7 @@ from microsoft_agents_a365.observability.core import (
     configure,
     get_tracer_provider,
 )
+from microsoft_agents_a365.observability.core.config import _telemetry_manager
 from microsoft_agents_a365.observability.core.constants import (
     GEN_AI_CALLER_AGENT_USER_CLIENT_IP,
     GEN_AI_EXECUTION_SOURCE_DESCRIPTION_KEY,
@@ -27,6 +28,7 @@ from microsoft_agents_a365.observability.core.constants import (
     GEN_AI_INPUT_MESSAGES_KEY,
 )
 from microsoft_agents_a365.observability.core.models.caller_details import CallerDetails
+from microsoft_agents_a365.observability.core.opentelemetry_scope import OpenTelemetryScope
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
@@ -96,6 +98,18 @@ class TestInvokeAgentScope(unittest.TestCase):
 
     def setUp(self):
         super().setUp()
+
+        # Reset TelemetryManager state to ensure fresh configuration
+
+        _telemetry_manager._tracer_provider = None
+        _telemetry_manager._span_processors = {}
+        OpenTelemetryScope._tracer = None
+
+        # Reconfigure to get a fresh TracerProvider
+        configure(
+            service_name="test-invoke-agent-service",
+            service_namespace="test-namespace",
+        )
 
         # Set up tracer to capture spans
         self.span_exporter = InMemorySpanExporter()
