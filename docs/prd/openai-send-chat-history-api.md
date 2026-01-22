@@ -226,6 +226,52 @@ The API SHALL extract text content following this priority:
 | Type hints | Complete type annotations (PEP 484) |
 | Pydantic version | ≥2.0 (for model validation) |
 
+### 5.1.1 Type Hints - NEVER Use `Any`
+
+**CRITICAL**: The use of `typing.Any` is **strictly forbidden** in this codebase. Using `Any` defeats the purpose of type checking and can hide bugs.
+
+**Required alternatives (in order of preference):**
+
+| Instead of `Any` | Use |
+|------------------|-----|
+| External SDK types | Import and use actual types from the SDK (e.g., `Session`, `TResponseInputItem`) |
+| Multiple known types | `Union[Type1, Type2, ...]` |
+| Pass-through data | `object` |
+| Dictionary values | `Dict[str, object]` or specific types |
+| Unknown external types (last resort) | `Protocol` - but confirm with developer first |
+
+**Preferred approach - Use actual SDK types:**
+
+```python
+from agents.memory import Session
+from agents.items import TResponseInputItem
+
+async def send_chat_history_async(
+    self,
+    turn_context: TurnContext,
+    session: Session,  # Use actual SDK type
+) -> OperationResult:
+    ...
+
+async def send_chat_history_messages_async(
+    self,
+    turn_context: TurnContext,
+    messages: List[TResponseInputItem],  # Use actual SDK type
+) -> OperationResult:
+    ...
+```
+
+**Why actual SDK types are preferred:**
+- Better IDE support (autocomplete, type checking)
+- Ensures compatibility with the external SDK
+- Less maintenance burden (no custom protocols to keep in sync)
+- Clearer intent for developers reading the code
+
+**When to use Protocol (last resort only):**
+If external types cannot be found or imported, a `Protocol` may be defined. However, this should be rare and requires confirmation with the developer before proceeding, as it may indicate a missing dependency or incorrect understanding of the external API.
+
+This requirement applies to both production code AND test files.
+
 ### 5.2 OpenAI SDK Compatibility
 
 | Requirement | Specification |

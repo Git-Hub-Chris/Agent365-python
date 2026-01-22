@@ -168,11 +168,44 @@ Place it before imports with one blank line after.
 
 ### Python Conventions
 
-- Type hints preferred (Pydantic models heavily used)
+- Type hints required on all function parameters and return types
 - Async/await patterns for I/O operations
 - Use explicit `None` checks: `if x is not None:` not `if x:`
 - Local imports should be moved to top of file
 - Return defensive copies of mutable data to protect singletons
+
+### Type Hints - NEVER Use `Any`
+
+**CRITICAL: Never use `typing.Any` in this codebase.** Using `Any` defeats the purpose of type checking and can hide bugs. Instead:
+
+1. **Use actual types from external SDKs** - When integrating with external libraries (OpenAI, LangChain, etc.), import and use their actual types:
+   ```python
+   from agents.memory import Session
+   from agents.items import TResponseInputItem
+
+   async def send_chat_history_async(self, session: Session) -> OperationResult:
+       ...
+   ```
+
+2. **Use `Union` for known possible types**:
+   ```python
+   from typing import Union
+   MessageType = Union[UserMessage, AssistantMessage, SystemMessage, Dict[str, object]]
+   ```
+
+3. **Use `object` for truly unknown types** that you only pass through:
+   ```python
+   def log_item(item: object) -> None: ...
+   ```
+
+4. **Use `Protocol` only as a last resort** - If external types cannot be found or imported, define a Protocol. However, **confirm with the developer first** before proceeding with this approach, as it may indicate a missing dependency or incorrect understanding of the external API.
+
+**Why this matters:**
+- `Any` disables all type checking for that variable
+- Bugs that type checkers would catch go unnoticed
+- Code readability suffers - developers don't know what types to expect
+- Using actual SDK types provides better IDE support and ensures compatibility
+- This applies to both production code AND test files
 
 ## CI/CD
 
