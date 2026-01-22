@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Use this skill when the user wants to commit staged changes. This skill checks formatting, runs linting, executes tests, generates a commit message, and commits the changes. Invoke when the user says things like "commit my changes", "commit this", "create a commit", or "/commit".
+description: Use this skill when the user wants to commit staged changes. This skill checks linting, then formatting (matching CI order), runs tests, generates a commit message, and commits the changes. Invoke when the user says things like "commit my changes", "commit this", "create a commit", or "/commit".
 allowed-tools: Bash, Read, Grep, Glob, Edit
 ---
 
@@ -18,29 +18,9 @@ git diff --cached --stat
 
 If there are no staged changes, inform the user and stop. Suggest they stage changes with `git add`.
 
-## Step 2: Check Code Formatting
+## Step 2: Check Linting
 
-Run the formatting check on the repository:
-
-```bash
-uv run --frozen ruff format --check .
-```
-
-### If formatting check fails:
-
-1. Inform the user that formatting issues were found
-2. Ask if they want you to auto-fix the formatting issues
-3. If yes, run: `uv run --frozen ruff format .`
-4. Show the user what files were reformatted
-5. Stage the formatting fixes by running `git add` only on the files that were reformatted (do not use `git add -u`)
-6. Continue to the next step
-
-### If formatting check passes:
-Continue to the next step.
-
-## Step 3: Check Linting
-
-Run the linting check:
+Run the linting check first (matches CI order in .github/workflows/ci.yml):
 
 ```bash
 uv run --frozen ruff check .
@@ -56,13 +36,46 @@ uv run --frozen ruff check .
    - STOP the commit process
    - Explain what needs to be manually fixed
 5. If all errors were auto-fixed:
-   - Stage the fixes: `git add -u`
+   - Stage the fixes by running `git add` only on the files that were fixed
    - Continue to the next step
 
 ### If linting check passes:
 Continue to the next step.
 
-## Step 4: Run Tests
+## Step 3: Check Code Formatting
+
+Run the formatting check (after linting, matches CI order):
+
+```bash
+uv run --frozen ruff format --check .
+```
+
+### If formatting check fails:
+
+1. Inform the user that formatting issues were found
+2. Ask if they want you to auto-fix the formatting issues
+3. If yes, run: `uv run --frozen ruff format .`
+4. Show the user what files were reformatted
+5. Stage the formatting fixes by running `git add` only on the files that were reformatted
+6. Continue to the next step
+
+### If formatting check passes:
+Continue to the next step.
+
+## Step 4: Re-verify After Auto-fixes
+
+**IMPORTANT**: If any auto-fixes were applied in Steps 2 or 3, re-run both checks to ensure consistency:
+
+```bash
+uv run --frozen ruff check .
+uv run --frozen ruff format --check .
+```
+
+This prevents commits that pass locally but fail CI (e.g., lint fixes that introduce formatting issues). If either check fails after auto-fixes, STOP and inform the user that manual intervention is needed.
+
+If no auto-fixes were applied, skip this step.
+
+## Step 5: Run Tests
 
 Run the unit tests (excluding integration tests):
 
@@ -84,7 +97,7 @@ uv run --frozen pytest tests/ -v --tb=short -m "not integration" 2>&1
 ### If tests pass:
 Continue to the next step.
 
-## Step 5: Generate Commit Message
+## Step 6: Generate Commit Message
 
 Analyze the staged changes to generate an appropriate commit message:
 
@@ -113,7 +126,7 @@ Types of changes to identify:
 - `Test` - Adding or updating tests
 - `Chore` - Maintenance tasks
 
-## Step 6: Confirm and Commit
+## Step 7: Confirm and Commit
 
 1. Show the user the proposed commit message
 2. Ask if they want to proceed with this message or modify it
