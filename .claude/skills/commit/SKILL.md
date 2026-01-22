@@ -32,7 +32,7 @@ uv run --frozen ruff format --check .
 2. Ask if they want you to auto-fix the formatting issues
 3. If yes, run: `uv run --frozen ruff format .`
 4. Show the user what files were reformatted
-5. Stage the formatting fixes: `git add -u` (only previously tracked files that were modified)
+5. Stage the formatting fixes by running `git add` only on the files that were reformatted (do not use `git add -u`)
 6. Continue to the next step
 
 ### If formatting check passes:
