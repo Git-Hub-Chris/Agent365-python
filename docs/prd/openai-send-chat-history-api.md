@@ -44,9 +44,15 @@ This manual conversion creates:
 - **Error-prone integrations**: Missing ID or timestamp handling may vary
 - **Feature parity gap**: The .NET SDK already provides framework-specific `SendChatHistoryAsync` methods for Agent Framework (PR #171) and Semantic Kernel (PR #173)
 
+### 1.2.1 Method Naming Convention
+
+This PRD defines two methods with the following naming convention:
+- **`send_chat_history_messages_async`**: Accepts a list of OpenAI `TResponseInputItem` messages directly
+- **`send_chat_history_async`**: Extracts messages from an OpenAI `Session` object (the more common use case)
+
 ### 1.2 Proposed Solution
 
-Implement an OpenAI-specific `send_chat_history_async` API in the `microsoft-agents-a365-tooling-extensions-openai` package that:
+Implement OpenAI-specific chat history APIs in the `microsoft-agents-a365-tooling-extensions-openai` package that:
 - Accepts OpenAI SDK native types directly (Session protocol items, message types)
 - Handles all conversion logic internally
 - Provides a seamless developer experience for OpenAI Agents SDK users
@@ -66,7 +72,7 @@ Implement an OpenAI-specific `send_chat_history_async` API in the `microsoft-age
 
 | Metric | Target |
 |--------|--------|
-| API adoption rate | 80% of OpenAI extension users use `send_chat_history_async` within 3 months |
+| API adoption rate | 80% of OpenAI extension users use `send_chat_history_async` or `send_chat_history_messages_async` within 3 months |
 | Code reduction | Average 15+ lines of boilerplate eliminated per integration |
 | Test coverage | ≥95% line coverage, ≥90% branch coverage |
 | Documentation completeness | 100% of public APIs documented with examples |
@@ -109,7 +115,7 @@ Implement an OpenAI-specific `send_chat_history_async` API in the `microsoft-age
 | **US-03** | As an OpenAI agent developer, I want missing message IDs to be auto-generated so that I don't need to track IDs manually | P0 | UUIDs generated for messages without IDs |
 | **US-04** | As an OpenAI agent developer, I want missing timestamps to use current UTC time so that all messages have valid timestamps | P0 | Current UTC timestamp used when not provided |
 | **US-05** | As an OpenAI agent developer, I want to receive clear success/failure results so that I can handle errors appropriately | P0 | `OperationResult` returned with error details on failure |
-| **US-05a** | As an OpenAI agent developer, I want to send my Session's conversation history directly so that I don't need to extract messages manually | P0 | `send_session_history_async` extracts and sends Session items |
+| **US-05a** | As an OpenAI agent developer, I want to send my Session's conversation history directly so that I don't need to extract messages manually | P0 | `send_chat_history_async` extracts and sends Session items |
 
 ### 3.2 Secondary User Stories
 
@@ -137,9 +143,9 @@ Implement an OpenAI-specific `send_chat_history_async` API in the `microsoft-age
 | **FR-08** | The API SHALL allow empty message lists (no-op, return success) | P0 | Unit tests |
 | **FR-09** | The API SHALL map OpenAI roles to `ChatHistoryMessage` roles ("user", "assistant", "system") | P0 | Unit tests |
 | **FR-10** | The API SHALL extract text content from OpenAI message content arrays | P0 | Unit tests |
-| **FR-11** | The API SHALL provide a `send_session_history_async` method that accepts an OpenAI Session | P0 | Unit tests |
-| **FR-12** | The `send_session_history_async` method SHALL call `session.get_items()` to retrieve messages | P0 | Unit tests |
-| **FR-13** | The `send_session_history_async` method SHALL support an optional `limit` parameter for `get_items()` | P1 | Unit tests |
+| **FR-11** | The API SHALL provide a `send_chat_history_async` method that accepts an OpenAI Session | P0 | Unit tests |
+| **FR-12** | The `send_chat_history_async` method SHALL call `session.get_items()` to retrieve messages | P0 | Unit tests |
+| **FR-13** | The `send_chat_history_async` method SHALL support an optional `limit` parameter for `get_items()` | P1 | Unit tests |
 | **FR-14** | The API SHALL include all item types from the session without filtering | P0 | Unit tests |
 
 ### 4.2 Method Signatures
@@ -147,27 +153,8 @@ Implement an OpenAI-specific `send_chat_history_async` API in the `microsoft-age
 The implementation SHALL provide the following method overloads:
 
 ```python
-# Primary method - accepts list of OpenAI message types
+# Primary method - extracts messages from OpenAI Session (most common use case)
 async def send_chat_history_async(
-    self,
-    turn_context: TurnContext,
-    messages: List[TResponseInputItem],
-    options: Optional[ToolOptions] = None,
-) -> OperationResult:
-    """
-    Sends OpenAI chat history to the MCP platform for threat protection.
-    
-    Args:
-        turn_context: TurnContext from the Agents SDK containing conversation info.
-        messages: List of OpenAI TResponseInputItem messages to send.
-        options: Optional ToolOptions for customization.
-    
-    Returns:
-        OperationResult indicating success or failure.
-    """
-
-# Secondary method - extracts messages from OpenAI Session
-async def send_session_history_async(
     self,
     turn_context: TurnContext,
     session: Session,
@@ -176,14 +163,33 @@ async def send_session_history_async(
 ) -> OperationResult:
     """
     Extracts chat history from an OpenAI Session and sends it to the MCP platform.
-    
+
     Args:
         turn_context: TurnContext from the Agents SDK containing conversation info.
         session: OpenAI Session instance to extract messages from.
         limit: Optional maximum number of items to retrieve from session.
                 If None, retrieves all items.
         options: Optional ToolOptions for customization.
-    
+
+    Returns:
+        OperationResult indicating success or failure.
+    """
+
+# Secondary method - accepts list of OpenAI message types directly
+async def send_chat_history_messages_async(
+    self,
+    turn_context: TurnContext,
+    messages: List[TResponseInputItem],
+    options: Optional[ToolOptions] = None,
+) -> OperationResult:
+    """
+    Sends OpenAI chat history to the MCP platform for threat protection.
+
+    Args:
+        turn_context: TurnContext from the Agents SDK containing conversation info.
+        messages: List of OpenAI TResponseInputItem messages to send.
+        options: Optional ToolOptions for customization.
+
     Returns:
         OperationResult indicating success or failure.
     """
@@ -302,13 +308,13 @@ Update `__init__.py` to export:
 │ + add_tool_servers_to_agent(...) -> Agent                          │
 │ + send_chat_history_async(                                          │
 │     turn_context: TurnContext,                                      │
-│     messages: List[TResponseInputItem],                             │
-│     options: Optional[ToolOptions]                                  │
-│   ) -> OperationResult                                              │
-│ + send_session_history_async(                                       │
-│     turn_context: TurnContext,                                      │
 │     session: Session,                                               │
 │     limit: Optional[int],                                           │
+│     options: Optional[ToolOptions]                                  │
+│   ) -> OperationResult                                              │
+│ + send_chat_history_messages_async(                                 │
+│     turn_context: TurnContext,                                      │
+│     messages: List[TResponseInputItem],                             │
 │     options: Optional[ToolOptions]                                  │
 │   ) -> OperationResult                                              │
 │ - _convert_openai_messages_to_chat_history(                         │
@@ -341,7 +347,8 @@ Update `__init__.py` to export:
 ```
 Developer          McpToolRegistrationService     McpToolServerConfigurationService     MCP Platform
     │                        │                              │                               │
-    │ send_chat_history_async│                              │                               │
+    │ send_chat_history_     │                              │                               │
+    │ messages_async         │                              │                               │
     │──────────────────────>│                               │                               │
     │                        │                              │                               │
     │                        │ validate inputs              │                               │
@@ -434,50 +441,6 @@ class SystemMessage:
 async def send_chat_history_async(
     self,
     turn_context: TurnContext,
-    messages: List[TResponseInputItem],
-    options: Optional[ToolOptions] = None,
-) -> OperationResult:
-    """
-    Sends OpenAI chat history to the MCP platform for threat protection.
-    """
-    # Validate inputs
-    if turn_context is None:
-        raise ValueError("turn_context cannot be None")
-    if messages is None:
-        raise ValueError("messages cannot be None")
-    
-    # Handle empty list as no-op
-    if len(messages) == 0:
-        self._logger.info("Empty message list provided, returning success")
-        return OperationResult.success()
-    
-    # Set default options
-    if options is None:
-        options = ToolOptions(orchestrator_name=self._orchestrator_name)
-    elif options.orchestrator_name is None:
-        options.orchestrator_name = self._orchestrator_name
-    
-    try:
-        # Convert OpenAI messages to ChatHistoryMessage format
-        chat_history_messages = self._convert_openai_messages_to_chat_history(messages)
-        
-        # Delegate to core service
-        return await self.config_service.send_chat_history(
-            turn_context=turn_context,
-            chat_history_messages=chat_history_messages,
-            options=options,
-        )
-    except ValueError:
-        # Re-raise validation errors
-        raise
-    except Exception as ex:
-        self._logger.error(f"Failed to send chat history: {ex}")
-        return OperationResult.failed(OperationError(ex))
-
-
-async def send_session_history_async(
-    self,
-    turn_context: TurnContext,
     session: Session,
     limit: Optional[int] = None,
     options: Optional[ToolOptions] = None,
@@ -490,13 +453,13 @@ async def send_session_history_async(
         raise ValueError("turn_context cannot be None")
     if session is None:
         raise ValueError("session cannot be None")
-    
+
     try:
         # Extract messages from session
         messages = await session.get_items(limit=limit)
-        
+
         # Delegate to the list-based method
-        return await self.send_chat_history_async(
+        return await self.send_chat_history_messages_async(
             turn_context=turn_context,
             messages=messages,
             options=options,
@@ -505,7 +468,51 @@ async def send_session_history_async(
         # Re-raise validation errors
         raise
     except Exception as ex:
-        self._logger.error(f"Failed to send session history: {ex}")
+        self._logger.error(f"Failed to send chat history: {ex}")
+        return OperationResult.failed(OperationError(ex))
+
+
+async def send_chat_history_messages_async(
+    self,
+    turn_context: TurnContext,
+    messages: List[TResponseInputItem],
+    options: Optional[ToolOptions] = None,
+) -> OperationResult:
+    """
+    Sends OpenAI chat history to the MCP platform for threat protection.
+    """
+    # Validate inputs
+    if turn_context is None:
+        raise ValueError("turn_context cannot be None")
+    if messages is None:
+        raise ValueError("messages cannot be None")
+
+    # Handle empty list as no-op
+    if len(messages) == 0:
+        self._logger.info("Empty message list provided, returning success")
+        return OperationResult.success()
+
+    # Set default options
+    if options is None:
+        options = ToolOptions(orchestrator_name=self._orchestrator_name)
+    elif options.orchestrator_name is None:
+        options.orchestrator_name = self._orchestrator_name
+
+    try:
+        # Convert OpenAI messages to ChatHistoryMessage format
+        chat_history_messages = self._convert_openai_messages_to_chat_history(messages)
+
+        # Delegate to core service
+        return await self.config_service.send_chat_history(
+            turn_context=turn_context,
+            chat_history_messages=chat_history_messages,
+            options=options,
+        )
+    except ValueError:
+        # Re-raise validation errors
+        raise
+    except Exception as ex:
+        self._logger.error(f"Failed to send chat history messages: {ex}")
         return OperationResult.failed(OperationError(ex))
 ```
 
@@ -573,15 +580,15 @@ with ExecuteToolScope.start(
 
 | Test ID | Test Name | Description |
 |---------|-----------|-------------|
-| UV-01 | `test_send_chat_history_async_validates_turn_context_none` | Verify ValueError when turn_context is None |
-| UV-02 | `test_send_chat_history_async_validates_messages_none` | Verify ValueError when messages is None |
-| UV-03 | `test_send_chat_history_async_empty_list_returns_success` | Verify empty list returns success (no-op) |
-| UV-04 | `test_send_chat_history_async_validates_activity_none` | Verify ValueError when activity is None |
-| UV-05 | `test_send_chat_history_async_validates_conversation_id` | Verify ValueError when conversation.id missing |
-| UV-06 | `test_send_chat_history_async_validates_message_id` | Verify ValueError when activity.id missing |
-| UV-07 | `test_send_chat_history_async_validates_user_message` | Verify ValueError when activity.text missing |
-| UV-08 | `test_send_session_history_async_validates_turn_context_none` | Verify ValueError when turn_context is None |
-| UV-09 | `test_send_session_history_async_validates_session_none` | Verify ValueError when session is None |
+| UV-01 | `test_send_chat_history_messages_async_validates_turn_context_none` | Verify ValueError when turn_context is None |
+| UV-02 | `test_send_chat_history_messages_async_validates_messages_none` | Verify ValueError when messages is None |
+| UV-03 | `test_send_chat_history_messages_async_empty_list_returns_success` | Verify empty list returns success (no-op) |
+| UV-04 | `test_send_chat_history_messages_async_validates_activity_none` | Verify ValueError when activity is None |
+| UV-05 | `test_send_chat_history_messages_async_validates_conversation_id` | Verify ValueError when conversation.id missing |
+| UV-06 | `test_send_chat_history_messages_async_validates_message_id` | Verify ValueError when activity.id missing |
+| UV-07 | `test_send_chat_history_messages_async_validates_user_message` | Verify ValueError when activity.text missing |
+| UV-08 | `test_send_chat_history_async_validates_turn_context_none` | Verify ValueError when turn_context is None |
+| UV-09 | `test_send_chat_history_async_validates_session_none` | Verify ValueError when session is None |
 
 #### 9.2.2 Conversion Tests
 
@@ -604,23 +611,23 @@ with ExecuteToolScope.start(
 
 | Test ID | Test Name | Description |
 |---------|-----------|-------------|
-| SP-01 | `test_send_chat_history_async_success` | Successful send returns succeeded=True |
-| SP-02 | `test_send_chat_history_async_with_options` | Custom ToolOptions applied |
-| SP-03 | `test_send_chat_history_async_default_orchestrator_name` | Default orchestrator name set |
-| SP-04 | `test_send_chat_history_async_delegates_to_config_service` | Delegation verified |
-| SP-05 | `test_send_session_history_async_success` | Session messages extracted and sent |
-| SP-06 | `test_send_session_history_async_with_limit` | Limit parameter passed to get_items |
-| SP-07 | `test_send_session_history_async_delegates_to_send_chat_history` | Delegation verified |
+| SP-01 | `test_send_chat_history_messages_async_success` | Successful send returns succeeded=True |
+| SP-02 | `test_send_chat_history_messages_async_with_options` | Custom ToolOptions applied |
+| SP-03 | `test_send_chat_history_messages_async_default_orchestrator_name` | Default orchestrator name set |
+| SP-04 | `test_send_chat_history_messages_async_delegates_to_config_service` | Delegation verified |
+| SP-05 | `test_send_chat_history_async_success` | Session messages extracted and sent |
+| SP-06 | `test_send_chat_history_async_with_limit` | Limit parameter passed to get_items |
+| SP-07 | `test_send_chat_history_async_delegates_to_send_chat_history_messages` | Delegation verified |
 
 #### 9.2.4 Error Handling Tests
 
 | Test ID | Test Name | Description |
 |---------|-----------|-------------|
-| EH-01 | `test_send_chat_history_async_http_error` | HTTP error returns failed result |
-| EH-02 | `test_send_chat_history_async_timeout_error` | Timeout returns failed result |
-| EH-03 | `test_send_chat_history_async_client_error` | Network error returns failed result |
-| EH-04 | `test_send_chat_history_async_conversion_error` | Conversion error returns failed result |
-| EH-05 | `test_send_session_history_async_get_items_error` | Session get_items error returns failed result |
+| EH-01 | `test_send_chat_history_messages_async_http_error` | HTTP error returns failed result |
+| EH-02 | `test_send_chat_history_messages_async_timeout_error` | Timeout returns failed result |
+| EH-03 | `test_send_chat_history_messages_async_client_error` | Network error returns failed result |
+| EH-04 | `test_send_chat_history_messages_async_conversion_error` | Conversion error returns failed result |
+| EH-05 | `test_send_chat_history_async_get_items_error` | Session get_items error returns failed result |
 
 ### 9.3 Integration Test Cases
 
@@ -658,8 +665,8 @@ from microsoft_agents_a365.tooling.extensions.openai import McpToolRegistrationS
 from microsoft_agents_a365.runtime import OperationResult
 
 
-class TestSendChatHistoryAsync:
-    """Tests for send_chat_history_async method."""
+class TestSendChatHistoryMessagesAsync:
+    """Tests for send_chat_history_messages_async method."""
 
     @pytest.fixture
     def service(self):
@@ -686,38 +693,38 @@ class TestSendChatHistoryAsync:
         user_msg = Mock()
         user_msg.role = "user"
         user_msg.content = "Hello"
-        
+
         assistant_msg = Mock()
         assistant_msg.role = "assistant"
         assistant_msg.content = "Hi there!"
-        
+
         return [user_msg, assistant_msg]
 
     @pytest.mark.asyncio
-    async def test_send_chat_history_async_validates_turn_context_none(
+    async def test_send_chat_history_messages_async_validates_turn_context_none(
         self, service, sample_openai_messages
     ):
-        """Test that send_chat_history_async validates turn_context."""
+        """Test that send_chat_history_messages_async validates turn_context."""
         with pytest.raises(ValueError, match="turn_context cannot be None"):
-            await service.send_chat_history_async(None, sample_openai_messages)
+            await service.send_chat_history_messages_async(None, sample_openai_messages)
 
     @pytest.mark.asyncio
-    async def test_send_chat_history_async_success(
+    async def test_send_chat_history_messages_async_success(
         self, service, mock_turn_context, sample_openai_messages
     ):
-        """Test successful send_chat_history_async call."""
+        """Test successful send_chat_history_messages_async call."""
         with patch.object(
-            service.config_service, 
-            'send_chat_history', 
+            service.config_service,
+            'send_chat_history',
             new_callable=AsyncMock
         ) as mock_send:
             mock_send.return_value = OperationResult.success()
-            
-            result = await service.send_chat_history_async(
-                mock_turn_context, 
+
+            result = await service.send_chat_history_messages_async(
+                mock_turn_context,
                 sample_openai_messages
             )
-            
+
             assert result.succeeded is True
             mock_send.assert_called_once()
 ```
@@ -731,7 +738,7 @@ class TestSendChatHistoryAsync:
 | ID | Criterion | Verification |
 |----|-----------|--------------|
 | AC-01 | `send_chat_history_async` method exists in `McpToolRegistrationService` | Code review |
-| AC-01a | `send_session_history_async` method exists in `McpToolRegistrationService` | Code review |
+| AC-01a | `send_chat_history_messages_async` method exists in `McpToolRegistrationService` | Code review |
 | AC-02 | Method accepts `List[TResponseInputItem]` parameter | Type checker passes |
 | AC-03 | Method returns `OperationResult` | Unit tests pass |
 | AC-04 | Missing message IDs are generated as UUIDs | Unit tests pass |
@@ -740,7 +747,7 @@ class TestSendChatHistoryAsync:
 | AC-07 | Validation errors raise `ValueError` with descriptive messages | Unit tests pass |
 | AC-07a | Empty message list returns `OperationResult.success()` | Unit tests pass |
 | AC-08 | HTTP errors return `OperationResult.failed()` | Unit tests pass |
-| AC-08a | `send_session_history_async` calls `session.get_items()` correctly | Unit tests pass |
+| AC-08a | `send_chat_history_async` calls `session.get_items()` correctly | Unit tests pass |
 
 ### 10.2 Non-Functional Acceptance Criteria
 
@@ -860,7 +867,7 @@ class TestSendChatHistoryAsync:
 
 | ID | Question | Status | Decision |
 |----|----------|--------|----------|
-| OQ-01 | Should we support OpenAI Session protocol directly in addition to message lists? | **Resolved** | **Yes** - Provide a separate API that extracts messages from Session |
+| OQ-01 | Should we support OpenAI Session protocol directly in addition to message lists? | **Resolved** | **Yes** - `send_chat_history_async` extracts messages from Session, `send_chat_history_messages_async` accepts message list directly |
 | OQ-02 | Should we add a synchronous wrapper `send_chat_history` for convenience? | **Deferred** | Skip for now - evaluate in future iteration |
 | OQ-03 | Should empty message lists be allowed (no-op) vs. raising ValueError? | **Resolved** | **Empty list allowed** - Return success with no-op |
 | OQ-04 | Should we support custom ID generators (injectable)? | **Resolved** | **No** - Use UUID by default for simplicity |
