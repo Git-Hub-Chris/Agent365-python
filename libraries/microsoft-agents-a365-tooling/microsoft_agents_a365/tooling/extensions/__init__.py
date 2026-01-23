@@ -25,4 +25,6 @@ for finder in sys.meta_path:
                     if path not in __path__ and not path.endswith(".__path_hook__"):
                         __path__.append(path)
         except (ImportError, TypeError):
+            # Silently skip finders that don't support our find_spec call signature
+            # or fail to locate the module - we'll try other finders in meta_path
             pass
