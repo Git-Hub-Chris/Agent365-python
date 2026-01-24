@@ -113,7 +113,7 @@ exclude = [
 
 [tool.ruff.lint.flake8-copyright]
 # Require this exact copyright header (matches CLAUDE.md specification)
-notice-rgx = "(?s)# Copyright \\(c\\) Microsoft Corporation\\.\\n# Licensed under the MIT License\\."
+notice-rgx = "# Copyright \\(c\\) Microsoft Corporation\\.\\r?\\n# Licensed under the MIT License\\."
 # (optional) ensure all files are checked regardless of size
 min-file-size = 1
 

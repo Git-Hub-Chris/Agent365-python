@@ -9,7 +9,6 @@ at build time, ensuring all packages in the monorepo use the exact same version.
 """
 
 from os import environ
-from typing import List
 
 
 def get_package_version() -> str:
@@ -106,7 +105,7 @@ def get_dynamic_dependencies(
     pyproject_path: str = "pyproject.toml",
     use_exact_match: bool = False,
     use_compatible_release: bool = False,
-) -> List[str]:
+) -> list[str]:
     """
     Read dependencies from pyproject.toml and update internal package versions.
 

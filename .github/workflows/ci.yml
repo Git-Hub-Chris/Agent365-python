@@ -109,7 +109,6 @@ jobs:
     - name: Check linting
       run: |
         uv run --frozen ruff check .
-      continue-on-error: true
 
     - name: Check formatting
       run: |
