@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/github/license/microsoft/Agent365-python?label=License)](LICENSE.md)
 [![Python Version](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python)](https://www.python.org/)
 [![Contributors](https://img.shields.io/github/contributors/microsoft/Agent365-python?label=Contributors&logo=github)](https://github.com/microsoft/Agent365-python/graphs/contributors)
+[![CI - Build, Test, and Publish SDKs](https://github.com/microsoft/Agent365-python/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/microsoft/Agent365-python/actions/workflows/ci.yml)
 
 > #### Note:
 > Use the information in this README to contribute to this open-source project. To learn about using this SDK in your projects, refer to the [Microsoft Agent 365 Developer documentation](https://learn.microsoft.com/microsoft-agent-365/developer/).
