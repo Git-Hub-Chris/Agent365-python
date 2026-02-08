@@ -177,4 +177,4 @@ jobs:
       continue-on-error: true
       env:
         TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.AZURE_DEVOPS_TOKEN }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
