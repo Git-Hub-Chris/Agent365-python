@@ -144,7 +144,7 @@ jobs:
 
     - name: Run integration tests
       # Only run integration tests if secrets are available
-      if: ${{ secrets.AZURE_OPENAI_API_KEY != '' && vars.AZURE_OPENAI_ENDPOINT != '' }}
+      if: ${{ secrets.AZURE_OPENAI_API_KEY }}
       run: |
         uv run --frozen pytest -m integration -v --tb=short
       env:
@@ -174,7 +174,8 @@ jobs:
       # 1. It's a push event (not a PR)
       # 2. The branch is a release/* branch
       # 3. There are SDK changes
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/') && needs.changed-sdks.outputs.python-sdk == 'true' && secrets.PYPI_TOKEN != ''
+      # Note: Requires PYPI_TOKEN secret to be configured in repository settings
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/') && needs.changed-sdks.outputs.python-sdk == 'true'
       run: |
         uv run twine upload --config-file .pypirc -r Agent365 dist/*
       continue-on-error: true
