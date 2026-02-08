@@ -110,7 +110,7 @@ jobs:
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
     - name: Install the latest version of uv and set the python version
-      uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
+      uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
       with:
         version: '0.6.x'
         python-version: ${{ matrix.python-version }}
@@ -120,7 +120,10 @@ jobs:
     
     - name: Install the project
       run: uv lock && uv sync --locked --all-extras --dev
-    
+
+    - name: Verify centralized version constraints
+      run: python scripts/verify_constraints.py
+
     - name: Check linting
       run: |
         uv run --frozen ruff check . --preview
