@@ -19,33 +19,33 @@ jobs:
   version-number:
     runs-on: ubuntu-latest
     steps:
-    - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-      with:
-        egress-policy: audit
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
 
-    - name: Checkout repository
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      with:
-        fetch-depth: 0  # Need full history for git versioning
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0  # Need full history for git versioning
 
-    - name: Set up Python
-      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.11'
 
-    - name: Install setuptools-git-versioning
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install setuptools-git-versioning
+      - name: Install setuptools-git-versioning
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install setuptools-git-versioning
 
-    - id: package_version
-      name: Calculate Package Version
-      run: |
-        cd ./versioning
-        version=$(python -m setuptools_git_versioning)
-        echo "Package version calculated: $version"
-        echo "PACKAGE_VERSION=$version" >> $GITHUB_OUTPUT
+      - id: package_version
+        name: Calculate Package Version
+        run: |
+          cd ./versioning
+          version=$(python -m setuptools_git_versioning)
+          echo "Package version calculated: $version"
+          echo "PACKAGE_VERSION=$version" >> $GITHUB_OUTPUT
 
     outputs:
       PACKAGE_VERSION: ${{ steps.package_version.outputs.PACKAGE_VERSION }}
@@ -56,19 +56,19 @@ jobs:
     outputs:
       python-sdk: ${{ steps.check_python_sdk.outputs.changed }}
     steps:
-    - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-      with:
-        egress-policy: audit
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
 
-    - name: Checkout repository
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      with:
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
-    - id: git_refs
-      name: Set Git refs for diff
-      run: |
+      - id: git_refs
+        name: Set Git refs for diff
+        run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
             echo "head=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
@@ -77,16 +77,16 @@ jobs:
             echo "head=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
-    - id: check_python_sdk
-      name: Check Python SDK changes
-      run: |
-        if git diff --name-only "${{ steps.git_refs.outputs.base }}" "${{ steps.git_refs.outputs.head }}" -- 'libraries/**' 'setup.py' 'pyproject.toml' 'versioning/**' | grep -q .; then
-          echo "Python SDK changes detected"
-          echo "changed=true" >> $GITHUB_OUTPUT
-        else
-          echo "No Python SDK changes detected"
-          echo "changed=false" >> $GITHUB_OUTPUT
-        fi
+      - id: check_python_sdk
+        name: Check Python SDK changes
+        run: |
+          if git diff --name-only "${{ steps.git_refs.outputs.base }}" "${{ steps.git_refs.outputs.head }}" -- 'libraries/**' 'setup.py' 'pyproject.toml' 'versioning/**' | grep -q .; then
+            echo "Python SDK changes detected"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "No Python SDK changes detected"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
 
   python-sdk:
     name: Python SDK
@@ -101,84 +101,84 @@ jobs:
         python-version: ['3.11', '3.12']
 
     steps:
-    - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
-      with:
-        egress-policy: audit
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
 
-    - name: Checkout repository
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-    - name: Install the latest version of uv and set the python version
-      uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
-      with:
-        version: '0.6.x'
-        python-version: ${{ matrix.python-version }}
-        working-directory: ./
-        enable-cache: true
-        cache-dependency-glob: "./pyproject.toml"
-    
-    - name: Install the project
-      run: uv lock && uv sync --locked --all-extras --dev
+      - name: Install the latest version of uv and set the python version
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        with:
+          version: '0.6.x'
+          python-version: ${{ matrix.python-version }}
+          working-directory: ./
+          enable-cache: true
+          cache-dependency-glob: "./pyproject.toml"
 
-    - name: Verify centralized version constraints
-      run: python scripts/verify_constraints.py
+      - name: Install the project
+        run: uv lock && uv sync --locked --all-extras --dev
 
-    - name: Check linting
-      run: |
-        uv run --frozen ruff check . --preview
+      - name: Verify centralized version constraints
+        run: python scripts/verify_constraints.py
 
-    - name: Check formatting
-      run: |
-        uv run --frozen ruff format --check .
+      - name: Check linting
+        run: |
+          uv run --frozen ruff check . --preview
 
-    - name: Build package
-      run: |
-        AGENT365_PYTHON_SDK_PACKAGE_VERSION=${{ needs.version-number.outputs.PACKAGE_VERSION }} uv build --all-packages --wheel
-      env:
-        AGENT365_PYTHON_SDK_PACKAGE_VERSION: ${{ needs.version-number.outputs.PACKAGE_VERSION }}
+      - name: Check formatting
+        run: |
+          uv run --frozen ruff format --check .
 
-    - name: Run unit tests
-      run: |
-        uv run --frozen pytest tests/ -v --tb=short -m "not integration"
+      - name: Build package
+        run: |
+          AGENT365_PYTHON_SDK_PACKAGE_VERSION=${{ needs.version-number.outputs.PACKAGE_VERSION }} uv build --all-packages --wheel
+        env:
+          AGENT365_PYTHON_SDK_PACKAGE_VERSION: ${{ needs.version-number.outputs.PACKAGE_VERSION }}
 
-    - name: Run integration tests
-      # Only run integration tests if secrets are available
-      if: github.event_name == 'push' && secrets.AZURE_OPENAI_API_KEY != '' && vars.AZURE_OPENAI_ENDPOINT != '' && vars.AZURE_OPENAI_DEPLOYMENT != '' && vars.AZURE_OPENAI_API_VERSION != ''
-      run: |
-        uv run --frozen pytest -m integration -v --tb=short
-      env:
-        AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-        AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT || '' }}
-        AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT || '' }}
-        AZURE_OPENAI_API_VERSION: ${{ vars.AZURE_OPENAI_API_VERSION || '' }}
-        ENABLE_OBSERVABILITY: 'true'
+      - name: Run unit tests
+        run: |
+          uv run --frozen pytest tests/ -v --tb=short -m "not integration"
 
-    # Copy package and samples to drop folder
-    - name: Copy package and samples to drop folder
-      run: |
-        mkdir -p ~/drop/python-${{ matrix.python-version }}/dist && cp -v dist/*.whl $_
+      - name: Run integration tests
+        # Only run integration tests if secrets are available
+        if: github.event_name == 'push' && secrets.AZURE_OPENAI_API_KEY != '' && vars.AZURE_OPENAI_ENDPOINT != '' && vars.AZURE_OPENAI_DEPLOYMENT != '' && vars.AZURE_OPENAI_API_VERSION != ''
+        run: |
+          uv run --frozen pytest -m integration -v --tb=short
+        env:
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT || '' }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT || '' }}
+          AZURE_OPENAI_API_VERSION: ${{ vars.AZURE_OPENAI_API_VERSION || '' }}
+          ENABLE_OBSERVABILITY: 'true'
 
-    # Zip files since upload-artifact does not seem like to like folders
-    - name: Create zip
-      run: cd ~/drop/python-${{ matrix.python-version }} && zip -r ~/drop/python-${{ matrix.python-version }}.zip .
+      # Copy package and samples to drop folder
+      - name: Copy package and samples to drop folder
+        run: |
+          mkdir -p ~/drop/python-${{ matrix.python-version }}/dist && cp -v dist/*.whl $_
 
-    - name: Upload package and samples as artifacts
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-      with:
-        name: python-${{ matrix.python-version }}
-        path: ~/drop/python-${{ matrix.python-version }}.zip
+      # Zip files since upload-artifact does not seem like to like folders
+      - name: Create zip
+        run: cd ~/drop/python-${{ matrix.python-version }} && zip -r ~/drop/python-${{ matrix.python-version }}.zip .
 
-    - name: Publish
-      # Only publish when:
-      # 1. It's a push event (not a PR)
-      # 2. The branch is a release/* branch
-      # 3. There are SDK changes
-      # Note: Requires PYPI_TOKEN secret to be configured in repository settings
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/') && needs.changed-sdks.outputs.python-sdk == 'true'
-      run: |
-        uv run twine upload --config-file .pypirc -r Agent365 dist/*
-      continue-on-error: true
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      - name: Upload package and samples as artifacts
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: python-${{ matrix.python-version }}
+          path: ~/drop/python-${{ matrix.python-version }}.zip
+
+      - name: Publish
+        # Only publish when:
+        # 1. It's a push event (not a PR)
+        # 2. The branch is a release/* branch
+        # 3. There are SDK changes
+        # Note: Requires PYPI_TOKEN secret to be configured in repository settings
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/') && needs.changed-sdks.outputs.python-sdk == 'true'
+        run: |
+          uv run twine upload --config-file .pypirc -r Agent365 dist/*
+        continue-on-error: true
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
