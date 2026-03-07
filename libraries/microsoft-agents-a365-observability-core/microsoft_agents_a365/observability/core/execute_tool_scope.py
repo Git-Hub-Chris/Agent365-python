@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+from datetime import datetime
+
 from .agent_details import AgentDetails
 from .constants import (
     EXECUTE_TOOL_OPERATION_NAME,
@@ -30,6 +32,9 @@ class ExecuteToolScope(OpenTelemetryScope):
         agent_details: AgentDetails,
         tenant_details: TenantDetails,
         request: Request | None = None,
+        parent_id: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> "ExecuteToolScope":
         """Creates and starts a new scope for tool execution tracing.
 
@@ -38,11 +43,20 @@ class ExecuteToolScope(OpenTelemetryScope):
             agent_details: The details of the agent making the call
             tenant_details: The details of the tenant
             request: Optional request details for additional context
+            parent_id: Optional parent Activity ID used to link this span to an upstream
+                operation
+            start_time: Optional explicit start time as a datetime object. Useful when
+                recording a tool call after execution has already completed.
+            end_time: Optional explicit end time as a datetime object. When provided,
+                the span will use this timestamp when disposed instead of the
+                current wall-clock time.
 
         Returns:
             A new ExecuteToolScope instance
         """
-        return ExecuteToolScope(details, agent_details, tenant_details, request)
+        return ExecuteToolScope(
+            details, agent_details, tenant_details, request, parent_id, start_time, end_time
+        )
 
     def __init__(
         self,
@@ -50,6 +64,9 @@ class ExecuteToolScope(OpenTelemetryScope):
         agent_details: AgentDetails,
         tenant_details: TenantDetails,
         request: Request | None = None,
+        parent_id: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
     ):
         """Initialize the tool execution scope.
 
@@ -58,6 +75,13 @@ class ExecuteToolScope(OpenTelemetryScope):
             agent_details: The details of the agent making the call
             tenant_details: The details of the tenant
             request: Optional request details for additional context
+            parent_id: Optional parent Activity ID used to link this span to an upstream
+                operation
+            start_time: Optional explicit start time as a datetime object. Useful when
+                recording a tool call after execution has already completed.
+            end_time: Optional explicit end time as a datetime object. When provided,
+                the span will use this timestamp when disposed instead of the
+                current wall-clock time.
         """
         super().__init__(
             kind="Internal",
@@ -65,6 +89,9 @@ class ExecuteToolScope(OpenTelemetryScope):
             activity_name=f"{EXECUTE_TOOL_OPERATION_NAME} {details.tool_name}",
             agent_details=agent_details,
             tenant_details=tenant_details,
+            parent_id=parent_id,
+            start_time=start_time,
+            end_time=end_time,
         )
 
         # Extract details using deconstruction-like approach
