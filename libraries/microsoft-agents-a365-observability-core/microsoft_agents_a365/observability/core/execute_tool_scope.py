@@ -12,6 +12,7 @@ from .constants import (
     GEN_AI_CONVERSATION_ID_KEY,
     GEN_AI_TOOL_ARGS_KEY,
     GEN_AI_TOOL_CALL_ID_KEY,
+    GEN_AI_TOOL_CALL_RESULT_KEY,
     GEN_AI_TOOL_DESCRIPTION_KEY,
     GEN_AI_TOOL_NAME_KEY,
     GEN_AI_TOOL_TYPE_KEY,
@@ -21,12 +22,12 @@ from .constants import (
     USER_ID_KEY,
     USER_NAME_KEY,
 )
+from .utils import safe_json_dumps, validate_and_normalize_ip
 from .models.user_details import UserDetails
 from .opentelemetry_scope import OpenTelemetryScope
 from .request import Request
 from .span_details import SpanDetails
 from .tool_call_details import ToolCallDetails
-from .utils import validate_and_normalize_ip
 
 
 class ExecuteToolScope(OpenTelemetryScope):
@@ -108,7 +109,9 @@ class ExecuteToolScope(OpenTelemetryScope):
         endpoint = details.endpoint
 
         self.set_tag_maybe(GEN_AI_TOOL_NAME_KEY, tool_name)
-        self.set_tag_maybe(GEN_AI_TOOL_ARGS_KEY, arguments)
+        if arguments is not None:
+            serialized = safe_json_dumps(arguments) if isinstance(arguments, dict) else arguments
+            self.set_tag_maybe(GEN_AI_TOOL_ARGS_KEY, serialized)
         self.set_tag_maybe(GEN_AI_TOOL_TYPE_KEY, tool_type)
         self.set_tag_maybe(GEN_AI_TOOL_CALL_ID_KEY, tool_call_id)
         self.set_tag_maybe(GEN_AI_TOOL_DESCRIPTION_KEY, description)
@@ -134,13 +137,15 @@ class ExecuteToolScope(OpenTelemetryScope):
                 validate_and_normalize_ip(user_details.user_client_ip),
             )
 
-    def record_response(self, response: str) -> None:
-        """Records response information for telemetry tracking.
+    def record_response(self, result: dict[str, object] | str) -> None:
+        """Record the tool call result for telemetry tracking.
 
-        Note: This method is intentionally a no-op as GEN_AI_EVENT_CONTENT was removed.
-        The method is kept for interface compatibility.
+        Per OTEL spec, the result is expected to be an object. If a string
+        is provided, it is recorded as-is (JSON string fallback). If a dict
+        is provided, it is serialized to JSON.
 
         Args:
-            response: The response to record
+            result: Tool call result as a structured dict or JSON string
         """
-        pass
+        serialized = safe_json_dumps(result) if isinstance(result, dict) else result
+        self.set_tag_maybe(GEN_AI_TOOL_CALL_RESULT_KEY, serialized)

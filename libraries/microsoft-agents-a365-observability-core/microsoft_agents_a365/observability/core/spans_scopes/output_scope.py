@@ -12,7 +12,9 @@ from ..constants import (
     USER_ID_KEY,
     USER_NAME_KEY,
 )
-from ..models.response import Response
+from ..message_utils import normalize_output_messages, serialize_messages
+from ..models.messages import OutputMessages
+from ..models.response import Response, ResponseMessagesParam
 from ..models.user_details import UserDetails
 from ..opentelemetry_scope import OpenTelemetryScope
 from ..request import Request
@@ -23,9 +25,13 @@ OUTPUT_OPERATION_NAME = "output_messages"
 
 
 class OutputScope(OpenTelemetryScope):
-    """Provides OpenTelemetry tracing scope for output messages."""
+    """Provides OpenTelemetry tracing scope for output messages.
 
-    _MAX_OUTPUT_MESSAGES = 5000
+    Output messages are set once (via the constructor or ``record_output_messages``)
+    rather than accumulated. For streaming scenarios, the agent developer should
+    collect all output (e.g. via a list or string builder) and pass the final
+    result to ``OutputScope``.
+    """
 
     @staticmethod
     def start(
@@ -87,12 +93,7 @@ class OutputScope(OpenTelemetryScope):
         )
 
         self.set_tag_maybe(GEN_AI_CONVERSATION_ID_KEY, request.conversation_id)
-
-        # Initialize accumulated messages list
-        self._output_messages: list[str] = list(response.messages)
-
-        # Set response messages
-        self.set_tag_maybe(GEN_AI_OUTPUT_MESSAGES_KEY, safe_json_dumps(self._output_messages))
+        self._set_output(response.messages)
 
         # Set user details if provided
         if user_details:
@@ -104,16 +105,24 @@ class OutputScope(OpenTelemetryScope):
                 validate_and_normalize_ip(user_details.user_client_ip),
             )
 
-    def record_output_messages(self, messages: list[str]) -> None:
+    def _set_output(self, messages: ResponseMessagesParam) -> None:
+        """Serialize and set the output messages attribute on the span."""
+        if isinstance(messages, dict):
+            self.set_tag_maybe(GEN_AI_OUTPUT_MESSAGES_KEY, safe_json_dumps(messages))
+        else:
+            normalized = normalize_output_messages(messages)
+            wrapper = OutputMessages(messages=list(normalized.messages))
+            self.set_tag_maybe(GEN_AI_OUTPUT_MESSAGES_KEY, serialize_messages(wrapper))
+
+    def record_output_messages(self, messages: ResponseMessagesParam) -> None:
         """Records the output messages for telemetry tracking.
 
-        Appends the provided messages to the accumulated output messages list.
-        The list is capped at _MAX_OUTPUT_MESSAGES to prevent unbounded memory growth.
+        Overwrites any previously set output messages. Accepts a single string,
+        a list of strings (auto-wrapped as OTEL OutputMessage), a versioned
+        ``OutputMessages`` wrapper, or a ``dict[str, object]`` for tool call
+        results (per OTEL spec).
 
         Args:
-            messages: List of output messages to append
+            messages: String(s), OutputMessages, or dict for tool call results
         """
-        self._output_messages.extend(messages)
-        if len(self._output_messages) > self._MAX_OUTPUT_MESSAGES:
-            self._output_messages = self._output_messages[-self._MAX_OUTPUT_MESSAGES :]
-        self.set_tag_maybe(GEN_AI_OUTPUT_MESSAGES_KEY, safe_json_dumps(self._output_messages))
+        self._set_output(messages)
