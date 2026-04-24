@@ -66,4 +66,4 @@ class OpenAIAgentsTraceInstrumentor(BaseInstrumentor):
         set_trace_processors([OpenAIAgentsTraceProcessor(agent365_tracer)])
 
     def _uninstrument(self, **kwargs: Any) -> None:
-        pass
+        set_trace_processors([])
