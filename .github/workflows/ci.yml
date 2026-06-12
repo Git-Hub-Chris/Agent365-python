@@ -95,90 +95,82 @@ jobs:
     defaults:
       run:
         working-directory: ./
+    env:
+      PYTHONPATH: ${{ github.workspace }}/versioning/helper
 
     strategy:
       matrix:
         python-version: ['3.11', '3.12']
 
     steps:
-      - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
-        with:
-          egress-policy: audit
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+    - name: Install the latest version of uv and set the python version
+      uses: astral-sh/setup-uv@v6
+      with:
+        version: '0.6.x'
+        python-version: ${{ matrix.python-version }}
+        working-directory: ./
+        enable-cache: true
+        cache-dependency-glob: "./pyproject.toml"
+    
+    - name: Install the project
+      run: uv lock && uv sync --locked --all-extras --dev
 
-      - name: Install the latest version of uv and set the python version
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-        with:
-          version: '0.6.x'
-          python-version: ${{ matrix.python-version }}
-          working-directory: ./
-          enable-cache: true
-          cache-dependency-glob: "./pyproject.toml"
+    - name: Verify centralized version constraints
+      run: uv run --frozen tox -e verify-constraints
 
-      - name: Install the project
-        run: uv lock && uv sync --locked --all-extras --dev
+    - name: Check linting
+      run: uv run --frozen tox -e lint
 
-      - name: Verify centralized version constraints
-        run: python scripts/verify_constraints.py
+    - name: Check formatting
+      run: uv run --frozen tox -e format
 
-      - name: Check linting
-        run: |
-          uv run --frozen ruff check . --preview
+    - name: Build package
+      run: |
+        AGENT365_PYTHON_SDK_PACKAGE_VERSION=${{ needs.version-number.outputs.PACKAGE_VERSION }} uv build --all-packages --wheel
+      env:
+        AGENT365_PYTHON_SDK_PACKAGE_VERSION: ${{ needs.version-number.outputs.PACKAGE_VERSION }}
 
-      - name: Check formatting
-        run: |
-          uv run --frozen ruff format --check .
+    - name: Run unit tests
+      run: uv run --frozen tox -e py3${{ matrix.python-version == '3.11' && '11' || '12' }}
 
-      - name: Build package
-        run: |
-          AGENT365_PYTHON_SDK_PACKAGE_VERSION=${{ needs.version-number.outputs.PACKAGE_VERSION }} uv build --all-packages --wheel
-        env:
-          AGENT365_PYTHON_SDK_PACKAGE_VERSION: ${{ needs.version-number.outputs.PACKAGE_VERSION }}
+    - name: Run integration tests
+      # Only run integration tests if secrets are available
+      if: ${{ vars.RUN_INTEGRATION_TESTS == 'true' }}
+      run: uv run --frozen tox -e integration
+      env:
+        AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+        AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+        AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
+        AZURE_OPENAI_API_VERSION: ${{ vars.AZURE_OPENAI_API_VERSION }}        
+        ENABLE_OBSERVABILITY: true
 
-      - name: Run unit tests
-        run: |
-          uv run --frozen pytest tests/ -v --tb=short -m "not integration"
+    # Copy package and samples to drop folder
+    - name: Copy package and samples to drop folder
+      run: |
+        mkdir -p ~/drop/python-${{ matrix.python-version }}/dist && cp -v dist/*.whl $_
 
-      - name: Run integration tests
-        # Only run integration tests if secrets are available
-        if: github.event_name == 'push' && secrets.AZURE_OPENAI_API_KEY != '' && vars.AZURE_OPENAI_ENDPOINT != '' && vars.AZURE_OPENAI_DEPLOYMENT != '' && vars.AZURE_OPENAI_API_VERSION != ''
-        run: |
-          uv run --frozen pytest -m integration -v --tb=short
-        env:
-          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-          AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT || '' }}
-          AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT || '' }}
-          AZURE_OPENAI_API_VERSION: ${{ vars.AZURE_OPENAI_API_VERSION || '' }}
-          ENABLE_OBSERVABILITY: 'true'
+    # Zip files since upload-artifact does not seem like to like folders
+    - name: Create zip
+      run: cd ~/drop/python-${{ matrix.python-version }} && zip -r ~/drop/python-${{ matrix.python-version }}.zip .
 
-      # Copy package and samples to drop folder
-      - name: Copy package and samples to drop folder
-        run: |
-          mkdir -p ~/drop/python-${{ matrix.python-version }}/dist && cp -v dist/*.whl $_
+    - name: Upload package and samples as artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-${{ matrix.python-version }}
+        path: ~/drop/python-${{ matrix.python-version }}.zip
 
-      # Zip files since upload-artifact does not seem like to like folders
-      - name: Create zip
-        run: cd ~/drop/python-${{ matrix.python-version }} && zip -r ~/drop/python-${{ matrix.python-version }}.zip .
-
-      - name: Upload package and samples as artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: python-${{ matrix.python-version }}
-          path: ~/drop/python-${{ matrix.python-version }}.zip
-
-      - name: Publish
-        # Only publish when:
-        # 1. It's a push event (not a PR)
-        # 2. The branch is a release/* branch
-        # 3. There are SDK changes
-        # Note: Requires PYPI_TOKEN secret to be configured in repository settings
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/') && needs.changed-sdks.outputs.python-sdk == 'true'
-        run: |
-          uv run twine upload --config-file .pypirc -r Agent365 dist/*
-        continue-on-error: true
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+    - name: Publish
+      # Only publish when:
+      # 1. It's a push event (not a PR)
+      # 2. The branch is a release/* branch
+      # 3. There are SDK changes
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/') && needs.changed-sdks.outputs.python-sdk == 'true'
+      run: |
+        uv run twine upload --config-file .pypirc -r Agent365 dist/*
+      continue-on-error: true
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.AZURE_DEVOPS_TOKEN }}

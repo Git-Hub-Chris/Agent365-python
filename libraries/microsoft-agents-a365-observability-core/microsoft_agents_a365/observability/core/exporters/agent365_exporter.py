@@ -17,18 +17,17 @@ from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.trace import StatusCode
 
-from ..constants import (
-    GEN_AI_INPUT_MESSAGES_KEY,
-    GEN_AI_OPERATION_NAME_KEY,
-    INVOKE_AGENT_OPERATION_NAME,
-)
 from .utils import (
+    DEFAULT_MAX_PAYLOAD_BYTES,
     build_export_url,
+    chunk_by_size,
+    estimate_span_bytes,
     get_validated_domain_override,
     hex_span_id,
     hex_trace_id,
     kind_name,
-    partition_by_identity,
+    parse_retry_after,
+    filter_and_partition_by_identity,
     status_name,
     truncate_span,
 )
@@ -50,7 +49,8 @@ class _Agent365Exporter(SpanExporter):
     Agent 365 span exporter for Agent 365:
       * Partitions spans by (tenantId, agentId)
       * Builds OTLP-like JSON: resourceSpans -> scopeSpans -> spans
-      * POSTs per group to https://{endpoint}/maven/agent365/agents/{agentId}/traces?api-version=1
+      * POSTs per group to https://{endpoint}/observability/tenants/{tenantId}/otlp/agents/{agentId}/traces?api-version=1
+      *   or, when use_s2s_endpoint is True, https://{endpoint}/observabilityService/tenants/{tenantId}/otlp/agents/{agentId}/traces?api-version=1
       * Adds Bearer token via token_resolver(agentId, tenantId)
     """
 
@@ -59,7 +59,7 @@ class _Agent365Exporter(SpanExporter):
         token_resolver: Callable[[str, str], str | None],
         cluster_category: str = "prod",
         use_s2s_endpoint: bool = False,
-        suppress_invoke_agent_input: bool = False,
+        max_payload_bytes: int = DEFAULT_MAX_PAYLOAD_BYTES,
     ):
         if token_resolver is None:
             raise ValueError("token_resolver must be provided.")
@@ -69,7 +69,7 @@ class _Agent365Exporter(SpanExporter):
         self._token_resolver = token_resolver
         self._cluster_category = cluster_category
         self._use_s2s_endpoint = use_s2s_endpoint
-        self._suppress_invoke_agent_input = suppress_invoke_agent_input
+        self._max_payload_bytes = max_payload_bytes
         # Read domain override once at initialization
         self._domain_override = get_validated_domain_override()
 
@@ -80,22 +80,35 @@ class _Agent365Exporter(SpanExporter):
             return SpanExportResult.FAILURE
 
         try:
-            groups = partition_by_identity(spans)
+            groups = filter_and_partition_by_identity(spans)
             if not groups:
-                # No spans with identity; treat as success
-                logger.info("No spans with tenant/agent identity found; nothing exported.")
+                # No eligible genAI spans to export after filtering/partitioning; treat as success
+                logger.info("No eligible genAI spans to export; nothing exported.")
                 return SpanExportResult.SUCCESS
 
-            # Debug: Log number of groups and total span count
+            # Log number of groups and total span count
             total_spans = sum(len(activities) for activities in groups.values())
-            logger.info(
+            logger.debug(
                 f"Found {len(groups)} identity groups with {total_spans} total spans to export"
             )
 
             any_failure = False
             for (tenant_id, agent_id), activities in groups.items():
-                payload = self._build_export_request(activities)
-                body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+                # Map and truncate spans first, then chunk by estimated byte size
+                mapped_spans = self._map_and_truncate_spans(activities)
+                resource_attrs = self._get_resource_attributes(activities)
+                chunks = chunk_by_size(
+                    mapped_spans,
+                    lambda ms: estimate_span_bytes(ms[0]),
+                    self._max_payload_bytes,
+                )
+
+                if len(chunks) > 1:
+                    # Logged at DEBUG to avoid leaking tenant/agent IDs in production logs.
+                    logger.debug(
+                        f"Split {len(activities)} spans into {len(chunks)} chunks "
+                        f"for tenantId: {tenant_id}, agentId: {agent_id}"
+                    )
 
                 # Resolve endpoint: domain override > default URL
                 if self._domain_override:
@@ -105,8 +118,8 @@ class _Agent365Exporter(SpanExporter):
 
                 url = build_export_url(endpoint, agent_id, tenant_id, self._use_s2s_endpoint)
 
-                # Debug: Log endpoint being used
-                logger.info(
+                # Log endpoint details at DEBUG to avoid leaking IDs in production logs
+                logger.debug(
                     f"Exporting {len(activities)} spans to endpoint: {url} "
                     f"(tenant: {tenant_id}, agent: {agent_id})"
                 )
@@ -115,10 +128,16 @@ class _Agent365Exporter(SpanExporter):
                 try:
                     token = self._token_resolver(agent_id, tenant_id)
                     if token:
+                        # Warn if sending bearer token over non-HTTPS connection
+                        if not url.lower().startswith("https://"):
+                            logger.warning(
+                                "Bearer token is being sent over a non-HTTPS connection. "
+                                "This may expose credentials in transit."
+                            )
                         headers["authorization"] = f"Bearer {token}"
-                        logger.info(f"Token resolved successfully for agent {agent_id}")
+                        logger.debug(f"Token resolved successfully for agent {agent_id}")
                     else:
-                        logger.info(f"No token returned for agent {agent_id}")
+                        logger.debug(f"No token returned for agent {agent_id}")
                 except Exception as e:
                     # If token resolution fails, treat as failure for this group
                     logger.error(
@@ -127,11 +146,40 @@ class _Agent365Exporter(SpanExporter):
                     any_failure = True
                     continue
 
-                # Basic retry loop
-                ok = self._post_with_retries(url, body, headers)
+                # Send each chunk (all-or-nothing: fail group on first chunk failure)
+                group_failed = False
+                for i, chunk in enumerate(chunks):
+                    payload = self._build_envelope(chunk, resource_attrs)
+                    body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+                    body_bytes = len(body.encode("utf-8"))
+                    logger.debug(
+                        f"Sending chunk {i + 1} of {len(chunks)} "
+                        f"({len(chunk)} spans, {body_bytes} bytes)"
+                    )
+                    # Defensive check: the estimator covers per-span content but not
+                    # envelope overhead (resource attributes, scope wrappers). Warn if
+                    # the assembled body exceeds the configured limit so operators can
+                    # observe estimator drift before the server starts rejecting requests.
+                    if body_bytes > self._max_payload_bytes:
+                        logger.warning(
+                            f"Chunk {i + 1} of {len(chunks)} body size ({body_bytes} bytes) "
+                            f"exceeds max_payload_bytes ({self._max_payload_bytes}); "
+                            "estimator may be under-counting envelope overhead. "
+                            f"Tenant: {tenant_id}, agent: {agent_id}, spans: {len(chunk)}."
+                        )
 
-                if not ok:
-                    any_failure = True
+                    ok = self._post_with_retries(url, body, headers)
+                    if not ok:
+                        logger.error(
+                            f"Chunk {i + 1} of {len(chunks)} failed for "
+                            f"tenant {tenant_id}, agent {agent_id}"
+                        )
+                        any_failure = True
+                        group_failed = True
+                        break
+
+                if group_failed:
+                    continue
 
             return SpanExportResult.FAILURE if any_failure else SpanExportResult.SUCCESS
 
@@ -181,7 +229,7 @@ class _Agent365Exporter(SpanExporter):
 
                 # 2xx => success
                 if 200 <= resp.status_code < 300:
-                    logger.info(
+                    logger.debug(
                         f"HTTP {resp.status_code} success on attempt {attempt + 1}. "
                         f"Correlation ID: {correlation_id}. "
                         f"Response: {self._truncate_text(resp.text, 200)}"
@@ -193,12 +241,19 @@ class _Agent365Exporter(SpanExporter):
 
                 # Retry transient
                 if resp.status_code in (408, 429) or 500 <= resp.status_code < 600:
+                    # Respect Retry-After header for 429 responses
+                    retry_after = parse_retry_after(resp.headers)
                     if attempt < DEFAULT_MAX_RETRIES:
-                        time.sleep(0.2 * (attempt + 1))
+                        if retry_after is not None:
+                            time.sleep(min(retry_after, 60.0))
+                        else:
+                            # Exponential backoff with base 0.5s
+                            time.sleep(0.5 * (2**attempt))
                         continue
                     # Final attempt failed
                     logger.error(
-                        f"HTTP {resp.status_code} final failure after {DEFAULT_MAX_RETRIES + 1} attempts. "
+                        f"HTTP {resp.status_code} final failure after "
+                        f"{DEFAULT_MAX_RETRIES + 1} attempts. "
                         f"Correlation ID: {correlation_id}. "
                         f"Response: {response_text}"
                     )
@@ -213,43 +268,57 @@ class _Agent365Exporter(SpanExporter):
 
             except requests.RequestException as e:
                 if attempt < DEFAULT_MAX_RETRIES:
-                    time.sleep(0.2 * (attempt + 1))
+                    # Exponential backoff with base 0.5s
+                    time.sleep(0.5 * (2**attempt))
                     continue
                 # Final attempt failed
-                logger.error(
-                    f"Request failed after {DEFAULT_MAX_RETRIES + 1} attempts with exception: {e}"
-                )
+                logger.error(f"Request failed after {DEFAULT_MAX_RETRIES + 1} attempts: {e}")
                 return False
         return False
 
     # ------------- Payload mapping ------------------
 
-    def _build_export_request(self, spans: Sequence[ReadableSpan]) -> dict[str, Any]:
-        # Group by instrumentation scope (name, version)
-        scope_map: dict[tuple[str, str | None], list[dict[str, Any]]] = {}
+    def _map_and_truncate_spans(
+        self, spans: Sequence[ReadableSpan]
+    ) -> list[tuple[dict[str, Any], str, str | None]]:
+        """Map ReadableSpans to OTLP dicts and apply per-span truncation.
 
+        Returns a list of (mapped_span, scope_name, scope_version) tuples so
+        that envelope grouping by instrumentation scope can be performed
+        efficiently after byte-size chunking.
+        """
+        result: list[tuple[dict[str, Any], str, str | None]] = []
         for sp in spans:
             scope = sp.instrumentation_scope
-            scope_key = (scope.name, scope.version)
-            scope_map.setdefault(scope_key, []).append(self._map_span(sp))
+            scope_name = scope.name if scope is not None else "unknown"
+            scope_version = scope.version if scope is not None else None
+            result.append((self._map_span(sp), scope_name, scope_version))
+        return result
 
-        scope_spans: list[dict[str, Any]] = []
-        for (name, version), mapped_spans in scope_map.items():
-            scope_spans.append(
-                {
-                    "scope": {
-                        "name": name,
-                        "version": version,
-                    },
-                    "spans": mapped_spans,
-                }
-            )
-
-        # Resource attributes (from the first span – all spans in a batch usually share resource)
-        # If you need to merge across spans, adapt accordingly.
-        resource_attrs = {}
+    @staticmethod
+    def _get_resource_attributes(spans: Sequence[ReadableSpan]) -> dict[str, Any]:
+        """Extract resource attributes from the first span in the batch."""
         if spans:
-            resource_attrs = dict(getattr(spans[0].resource, "attributes", {}) or {})
+            return dict(getattr(spans[0].resource, "attributes", {}) or {})
+        return {}
+
+    def _build_envelope(
+        self,
+        mapped_spans: Sequence[tuple[dict[str, Any], str, str | None]],
+        resource_attrs: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Build an OTLP export request envelope from pre-mapped spans."""
+        scope_map: dict[tuple[str, str | None], list[dict[str, Any]]] = {}
+        for mapped_span, scope_name, scope_version in mapped_spans:
+            scope_map.setdefault((scope_name, scope_version), []).append(mapped_span)
+
+        scope_spans: list[dict[str, Any]] = [
+            {
+                "scope": {"name": name, "version": version},
+                "spans": spans,
+            }
+            for (name, version), spans in scope_map.items()
+        ]
 
         return {
             "resourceSpans": [
@@ -261,7 +330,7 @@ class _Agent365Exporter(SpanExporter):
         }
 
     def _map_span(self, sp: ReadableSpan) -> dict[str, Any]:
-        ctx = sp.context
+        ctx = sp.get_span_context()
 
         parent_span_id = None
         if sp.parent is not None and sp.parent.span_id != 0:
@@ -269,19 +338,6 @@ class _Agent365Exporter(SpanExporter):
 
         # attributes
         attrs = dict(sp.attributes or {})
-
-        # Suppress input messages if configured and current span is an InvokeAgent span
-        if self._suppress_invoke_agent_input:
-            # Check if current span is an InvokeAgent span by:
-            # 1. Span name starts with "invoke_agent"
-            # 2. Has attribute gen_ai.operation.name set to INVOKE_AGENT_OPERATION_NAME
-            operation_name = attrs.get(GEN_AI_OPERATION_NAME_KEY)
-            if (
-                sp.name.startswith(INVOKE_AGENT_OPERATION_NAME)
-                and operation_name == INVOKE_AGENT_OPERATION_NAME
-            ):
-                # Remove input messages attribute
-                attrs.pop(GEN_AI_INPUT_MESSAGES_KEY, None)
 
         # events
         events = []

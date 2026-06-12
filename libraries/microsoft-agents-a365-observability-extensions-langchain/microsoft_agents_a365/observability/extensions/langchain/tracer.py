@@ -3,6 +3,7 @@
 
 import logging
 import re
+from collections import OrderedDict
 from collections.abc import Iterator
 from itertools import chain
 from threading import RLock
@@ -48,7 +49,6 @@ from microsoft_agents_a365.observability.extensions.langchain.utils import (
     model_name,
     output_messages,
     prompts,
-    set_execution_type,
     token_counts,
     tools,
 )
@@ -69,6 +69,8 @@ CONTEXT_ATTRIBUTES = (
 
 
 class CustomLangChainTracer(BaseTracer):
+    _MAX_TRACKED_RUNS = 10000
+
     __slots__ = (
         "_tracer",
         "_separate_trace_from_runtime_context",
@@ -82,14 +84,15 @@ class CustomLangChainTracer(BaseTracer):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """Initialize the OpenInferenceTracer.
+        """Initialize the CustomLangChainTracer.
 
         Args:
-            tracer (trace_api.Tracer): The OpenTelemetry tracer for creating spans.
-            separate_trace_from_runtime_context (bool): When True, always start a new trace for each
-                span without a parent, isolating it from any existing trace in the runtime context.
-            *args (Any): Positional arguments for BaseTracer.
-            **kwargs (Any): Keyword arguments for BaseTracer.
+            tracer: The OpenTelemetry tracer for creating spans.
+            separate_trace_from_runtime_context: When True, always start a new
+                trace for each span without a parent, isolating it from any
+                existing trace in the runtime context.
+            *args: Positional arguments forwarded to BaseTracer.
+            **kwargs: Keyword arguments forwarded to BaseTracer.
         """
         super().__init__(*args, **kwargs)
         if TYPE_CHECKING:
@@ -98,11 +101,18 @@ class CustomLangChainTracer(BaseTracer):
         self.run_map = DictWithLock[str, Run](self.run_map)
         self._tracer = tracer
         self._separate_trace_from_runtime_context = separate_trace_from_runtime_context
-        self._spans_by_run: dict[UUID, Span] = DictWithLock[UUID, Span]()
+        self._spans_by_run: OrderedDict[UUID, Span] = OrderedDict()
         self._lock = RLock()  # handlers may be run in a thread by langchain
 
     def get_span(self, run_id: UUID) -> Span | None:
-        return self._spans_by_run.get(run_id)
+        with self._lock:
+            return self._spans_by_run.get(run_id)
+
+    @staticmethod
+    def _cap_ordered_dict(d: OrderedDict, max_size: int) -> None:
+        """Evict oldest entries from an OrderedDict to stay within max_size."""
+        while len(d) > max_size:
+            d.popitem(last=False)
 
     def _start_trace(self, run: Run) -> None:
         self.run_map[str(run.id)] = run
@@ -142,12 +152,14 @@ class CustomLangChainTracer(BaseTracer):
         # token = context_api.attach(context)
         with self._lock:
             self._spans_by_run[run.id] = span
+            self._cap_ordered_dict(self._spans_by_run, self._MAX_TRACKED_RUNS)
 
     def _end_trace(self, run: Run) -> None:
         self.run_map.pop(str(run.id), None)
         if context_api.get_value(_SUPPRESS_INSTRUMENTATION_KEY):
             return
-        span = self._spans_by_run.pop(run.id, None)
+        with self._lock:
+            span = self._spans_by_run.pop(run.id, None)
         if span:
             try:
                 _update_span(span, run)
@@ -162,39 +174,43 @@ class CustomLangChainTracer(BaseTracer):
         pass
 
     def on_llm_error(self, error: BaseException, *args: Any, run_id: UUID, **kwargs: Any) -> Run:
-        if span := self._spans_by_run.get(run_id):
+        with self._lock:
+            span = self._spans_by_run.get(run_id)
+        if span:
             record_exception(span, error)
         return super().on_llm_error(error, *args, run_id=run_id, **kwargs)
 
     def on_chain_error(self, error: BaseException, *args: Any, run_id: UUID, **kwargs: Any) -> Run:
-        if span := self._spans_by_run.get(run_id):
+        with self._lock:
+            span = self._spans_by_run.get(run_id)
+        if span:
             record_exception(span, error)
         return super().on_chain_error(error, *args, run_id=run_id, **kwargs)
 
     def on_retriever_error(
         self, error: BaseException, *args: Any, run_id: UUID, **kwargs: Any
     ) -> Run:
-        if span := self._spans_by_run.get(run_id):
+        with self._lock:
+            span = self._spans_by_run.get(run_id)
+        if span:
             record_exception(span, error)
         return super().on_retriever_error(error, *args, run_id=run_id, **kwargs)
 
     def on_tool_error(self, error: BaseException, *args: Any, run_id: UUID, **kwargs: Any) -> Run:
-        if span := self._spans_by_run.get(run_id):
+        with self._lock:
+            span = self._spans_by_run.get(run_id)
+        if span:
             record_exception(span, error)
         return super().on_tool_error(error, *args, run_id=run_id, **kwargs)
 
     def on_chat_model_start(self, *args: Any, **kwargs: Any) -> Run:
+        """Handle chat model start events.
+
+        Delegates to ``LangChainTracer.on_chat_model_start`` to obtain correct
+        chat-formatted spans. The ``BaseTracer`` implementation requires setting
+        an internal ``_schema_format`` flag; delegating to ``LangChainTracer``
+        avoids depending on that private attribute.
         """
-        This emulates the behavior of the LangChainTracer.
-        https://github.com/langchain-ai/langchain/blob/c01467b1f4f9beae8f1edb105b17aa4f36bf6573/libs/core/langchain_core/tracers/langchain.py#L115
-
-        Although this method exists on the parent class, i.e. `BaseTracer`,
-        it requires setting `self._schema_format = "original+chat"`.
-        https://github.com/langchain-ai/langchain/blob/c01467b1f4f9beae8f1edb105b17aa4f36bf6573/libs/core/langchain_core/tracers/base.py#L170
-
-        But currently self._schema_format is marked for internal use.
-        https://github.com/langchain-ai/langchain/blob/c01467b1f4f9beae8f1edb105b17aa4f36bf6573/libs/core/langchain_core/tracers/base.py#L60
-        """  # noqa: E501
         return LangChainTracer.on_chat_model_start(self, *args, **kwargs)  # type: ignore
 
 
@@ -233,7 +249,6 @@ def _update_span(span: Span, run: Run) -> None:
             dict(
                 flatten(
                     chain(
-                        set_execution_type(),
                         add_operation_type(run),
                         invoke_agent_input_message(run.inputs),
                         invoke_agent_output_message(run.outputs),
