@@ -157,7 +157,7 @@ jobs:
       run: cd ~/drop/python-${{ matrix.python-version }} && zip -r ~/drop/python-${{ matrix.python-version }}.zip .
 
     - name: Upload package and samples as artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: python-${{ matrix.python-version }}
         path: ~/drop/python-${{ matrix.python-version }}.zip
